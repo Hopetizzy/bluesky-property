@@ -1,0 +1,6746 @@
+Yo, buddy. Yeah. We got a little work to do. So, you remember the guy said I want to do, um, a, like a real estate stuff like that. How do I put it? Where they list property. Listing of property, like a real estate. So, they list property in the website. Confirmation, verification, everything is done on the website. So, the guy told me he want to do it for four states, just four states. And he said the admin will be able to verify. Okay, he said there will be a registration place where other people that want to list their property will be able to list, but the admin, which then the admin will be able to verify the property before it can be displayed on the website. Once those people upload the property. So then, we approve it. If we do not approve it, it will not show, while them will be able to upload their own. And it's for rent and loan, not sales, not buy. So, and give me the name, so I will send the name to you. I go and listening to the voice note he sent me, so I will send it to, I will tell you how it should be. So, I hope you'll be able to understand.
+Yeah buddy, I understand what you’re describing. 👌
+
+What you’re talking about is basically a **verified real-estate rental/property-listing platform**, not a normal “buy and sell houses” website.
+
+The core flow I’m hearing is:
+
+1. **Platform covers 4 states**
+
+   * Properties are organized/filterable by state and probably location.
+
+2. **Property owners/agents register**
+
+   * They create an account.
+   * They can submit their properties themselves.
+   * They provide things like property type, location, rent/lease price, photos, description, amenities, etc.
+
+3. **Properties don't immediately go public**
+
+   * Submission enters something like `Pending Verification`.
+   * Admin reviews the property.
+   * Admin can **Approve**, **Reject**, or potentially request changes.
+
+4. **Only approved properties appear publicly**
+
+   * This is important because the platform is positioning itself around **verified listings**.
+   * Rejected/unverified properties remain hidden from the public.
+
+5. **Rental/lease only**
+
+   * No property sales.
+   * So we're dealing with things like:
+
+     * Apartments
+     * Houses
+     * Flats
+     * Offices/commercial spaces, if included
+     * Short/long-term rentals, depending on what he specifies.
+
+6. **Admin dashboard**
+
+   * Manage users/agents.
+   * Review submitted properties.
+   * Verify/approve/reject listings.
+   * Manage published properties.
+   * Probably manage reports, locations, and other platform data.
+
+And I suspect there's another important piece: **the person submitting a property and the person looking for a property are different roles.**
+
+So we'd probably have something like:
+
+**Admin**
+→ verifies everything
+
+**Property Provider / Agent**
+→ registers → submits property → waits for verification
+
+**Renter**
+→ searches → views verified property → contacts/requests the provider
+
+But **don't let us start designing the database or architecture yet.** 😄
+
+Send me the **name and the details from his voice note** first. Once you've listened to it, dump everything he said here—even if it's messy or you have to explain it in your own words.
+
+I'll turn the whole thing into a clean **requirements breakdown**, separating:
+
+* what he explicitly requested
+* what the platform actually needs
+* unclear/missing requirements
+* potential scope creep
+* recommended MVP features
+
+That way we don't accidentally build a ₦2M spaceship when the client only asked for a verified rental-listing platform. 😂
+
+So, I roughly listened to the voice note, and he said the name will be Blue Sky Property Management. And the property listing, that once the property shows the image of the property, the apartment that they want to rent. So, when they click apply, they will go to the application form. And also, there will be a message button so that if the customer wants to message about inquiries or something like that, so that the admin will be able to reply them about any other inquiries, or the bot, so like a frequently asked question bot like that, to immediately give them a response about what they are asking about. We are not including AI, we just bought that already know some keywords there or something. Or better still, the admin should be able to reply them. So, yeah. And also again, the property listing. So during the, when they click apply for that rental property they want to rent, for that apartment they want to rent, they will be able to apply, they will be able to fill their names, and include their credit checks, like their voter's card or something to validate their credibility. And also, they will be able to choose if it is, depending on the property, if it is one self-contained or one-bedroom flat, two-bedroom flat, or whatever they want. So they will be able to input all those information. And also, for the admin, the admin will be able to change, will be able to add, what is it called, the admin will be able to add their Facebook, let's say their Facebook accounts will be there for more information so that, you know, for their Facebook accounts, their Gmail for support, and any other thing. And they said the payment option is not that they are implementing a payment gateway. No, they will just only put, if the customer decides to pay on the platform, then they will just use a PayPal, where they will send verification, a PayPal account or cash, cashback, I don't know what they call that, so it will be there. And then, during the application, after the application form has been filled, then they can submit proof of payment for approval. And yeah, I think that is it. And for the, I think that is it for now. I will listen to the remaining voice note and let you know what they also describe.
+Yep, now the picture is much clearer. This is becoming more than a simple property-listing website — it’s a **rental property management and application platform** for Blue Sky Property Management.
+
+Here’s what I’ve captured from the new details:
+
+### 🏠 Public side
+
+A visitor can:
+
+* Browse **verified rental properties**
+* Filter/search properties by things like:
+
+  * State
+  * Location
+  * Property type
+  * Number of bedrooms
+  * Price/rent
+* Open a property to see:
+
+  * Images
+  * Description
+  * Location
+  * Available unit type
+  * Rental price
+  * Other property details
+* Click **Apply**
+* Click **Message/Inquiry**
+
+### 📝 Rental application
+
+When someone clicks **Apply**, they get an application form containing things such as:
+
+* Full name
+* Contact information
+* Property they're applying for
+* Preferred unit/property type
+* Identification/verification documents
+* Possibly employment/income information
+* Other credibility/tenant information
+* Proof of payment, where applicable
+
+One thing I want us to be careful about: **“credit check” and “upload your voter's card” are not necessarily the same thing.** A voter's card is an identity document, while a credit check is a financial/credit-history verification. We should clarify exactly what Blue Sky means before implementing that part.
+
+### 💬 Messaging
+
+There are two possible approaches:
+
+**Option A — Admin messaging**
+
+Customer submits an inquiry → admin sees it in dashboard → admin responds.
+
+This is the safer MVP.
+
+**Option B — FAQ/keyword responder**
+
+For common questions, predefined responses can trigger based on keywords.
+
+For example:
+
+> “How much is the rent?”
+
+→ predefined response.
+
+> “Where is the property located?”
+
+→ predefined response.
+
+No AI required.
+
+I'd actually recommend **building both**, but keeping the keyword responder extremely simple. Anything it doesn't understand gets routed to the admin.
+
+### 💳 Payment
+
+This is another important distinction.
+
+They **don't want an integrated payment gateway**.
+
+Instead, the website can display their accepted payment instructions, e.g.:
+
+* Bank transfer
+* PayPal, if they actually use it
+* Whatever other payment method they specify
+
+Then the applicant uploads:
+
+**Proof of payment → Admin reviews → Admin approves/rejects.**
+
+So we're basically building a **payment-proof verification workflow**, not a payment system.
+
+### 👨‍💼 Admin dashboard
+
+This is going to be the heart of the system.
+
+Admin should be able to:
+
+* Add/edit/delete properties
+* Review submitted properties
+* Approve/reject property listings
+* Manage property availability
+* View rental applications
+* Review applicant documents
+* Review payment proofs
+* Approve/reject applications
+* View customer inquiries
+* Reply to customers
+* Manage FAQ responses
+* Manage contact information
+* Add/edit Facebook/social links
+* Add/edit support email
+* Potentially manage the four supported states
+
+And the critical rule remains:
+
+**Submitted property ≠ Published property.**
+
+`Draft → Submitted → Pending Verification → Approved → Published`
+
+or
+
+`Submitted → Rejected`
+
+That's a very important part of the system.
+
+---
+
+### One architectural decision I already see
+
+We should **not** treat “property” and “rental unit” as exactly the same thing.
+
+For example:
+
+**Property**
+
+> Blue Sky Estate, Ibadan
+
+Could contain:
+
+* 5 × self-contained units
+* 8 × 1-bedroom units
+* 4 × 2-bedroom units
+
+Each unit type could have its own:
+
+* Price
+* Availability
+* Number available
+* Application status
+
+That will make the platform much more useful than simply putting “2-bedroom — ₦X” on a property card.
+
+But let's **not lock that model yet** until you've listened to the rest of his voice note.
+
+Send me the remaining requirements when you get them. Then we'll consolidate everything into the actual **Blue Sky Property Management requirements/specification** before we touch code.
+
+Okay, so I think that is almost everything that I said. And one thing we need to specify that, those agents or property owners that want to list their property for rent in the application, once they create an account to upload their property, they will just pay a one-time fee for them to be able to. So, they will still use the same payment proof or payment stuff. So, they will see the same payment integration, depending on the payment method the admin put out. That is what they will see, and then they will pay and upload the proof of payment before they can upload any property. So yeah. And, so there's one thing to clarify. Well, is there anything to clarify? I think we are good to go. And yes, they need the credibility to know that, okay, this person actually is serious to rent the property or has the money to actually pay for rent when they acquire the property. And also, we need to verify that this person is truly a citizen of the state or a citizen of the country. Can't just rent to anybody for safety and security reason.
+Yep. **Now we have enough to define the system properly.** And that new agent/property-owner fee changes one important part of the architecture.
+
+I’d frame Blue Sky as a **verified rental marketplace + rental application management system**, with two separate verification pipelines.
+
+### 1. Property-provider pipeline
+
+Someone who wants to list a property:
+
+**Register → Pay listing fee → Upload payment proof → Admin verifies payment → Property submission unlocked → Submit property → Admin verifies property → Published**
+
+So they **cannot even submit a property until their listing fee is verified**.
+
+The admin controls the fee amount and payment instructions from the dashboard.
+
+---
+
+### 2. Tenant/applicant pipeline
+
+Someone looking for a property:
+
+**Browse → Select property → Apply → Provide identity/credibility information → Submit documents → Payment/proof if required → Admin reviews → Approve/Reject**
+
+And this is where your clarification about credibility matters.
+
+The system should collect information that helps Blue Sky establish:
+
+* **Identity** — who is this person?
+* **Location/residency/citizenship information** — depending on Blue Sky's actual legal requirements.
+* **Financial/rental capability** — evidence that they're capable of meeting the rental obligation.
+* **Supporting documents** — whatever Blue Sky decides is acceptable.
+* **Application/payment status**
+
+One important correction, though: **don't hard-code “must be a citizen of the state.”** States don't have citizenship in the same sense countries do. If Blue Sky means *resident of the state*, *Nigerian citizen*, or simply *verified identity and acceptable residency*, that should be an explicit business rule.
+
+And because we're dealing with IDs and potentially sensitive financial information, the system should also have proper document access controls. We don't want someone's ID document casually sitting behind `/uploads/random-file.jpg`. 😅
+
+### The system is therefore roughly:
+
+```text
+                    BLUE SKY PROPERTY MANAGEMENT
+                              │
+             ┌────────────────┴────────────────┐
+             │                                 │
+      PROPERTY PROVIDERS                    RENTERS
+             │                                 │
+         Register                           Browse
+             │                                 │
+       Pay listing fee                   Select property
+             │                                 │
+      Upload payment proof                  Apply
+             │                                 │
+        Admin verifies                Identity/credibility
+             │                                 │
+       Submit property                  Documents/payment
+             │                                 │
+        Admin verifies                    Admin review
+             │                                 │
+       APPROVED / REJECTED              APPROVED / REJECTED
+             │
+          Published
+```
+
+### And the admin is basically the control tower
+
+The admin should control:
+
+* Property verification
+* Provider accounts
+* Listing fees
+* Payment instructions
+* Payment-proof verification
+* Rental applications
+* Applicant verification
+* Applicant documents
+* Property availability
+* Messages/inquiries
+* FAQ/keyword responses
+* Four-state coverage
+* Website contact/social information
+
+**This is a solid MVP scope.**
+
+The next thing I'd do isn't coding yet. I'd turn everything we've gathered into a **proper functional specification + user roles + feature list + database/data model**, because there are enough moving parts now that jumping straight into React/Supabase would be asking for Bugzilla to become our co-founder. 😂
+
+All right, perfect. Now, I think we can move to the architecture and database relationship and all that stuff. So, and they were like, okay, we should look at other listing platforms to know the way we can move around, but they don't know that we already know what we actually want to do for them. And, yeah. So they now remove the four-state limit that they can do any state. They can post in, they can post platform in any state. So they have removed the four-state limit.
+Exactly. **That four-state restriction should disappear from the architecture entirely.** We shouldn't build `state = Ibadan/Lagos/etc.` into anything. Blue Sky should be **Nigeria-wide from day one**, with states, LGAs, cities, and areas represented as data.
+
+And yes — this is the right moment to design the architecture before writing UI code.
+
+## 🏗️ Blue Sky Property Management — System Architecture v1
+
+I'd structure the system around **four major domains**:
+
+```text
+                         BLUE SKY PLATFORM
+                                │
+       ┌────────────────────────┼────────────────────────┐
+       │                        │                        │
+   PROPERTY SIDE           RENTAL SIDE              PLATFORM
+       │                        │                        │
+   Providers                 Applicants              Admin
+   Properties                Applications            Settings
+   Listings                  Documents               Payments
+   Units                     Payments                Messages
+```
+
+### The important principle
+
+There are **three different people/entities** we must not mix together:
+
+1. **Admin** — controls the platform
+2. **Property Provider** — owner/agent who lists property
+3. **Applicant/Tenant** — person looking to rent
+
+A provider can submit properties.
+
+An applicant can apply for properties.
+
+Admin controls verification between both.
+
+---
+
+# 1. Users
+
+At the center:
+
+### `profiles`
+
+| Field        | Purpose                      |
+| ------------ | ---------------------------- |
+| `id`         | User ID                      |
+| `email`      | Login email                  |
+| `phone`      | Phone number                 |
+| `full_name`  | User name                    |
+| `role`       | admin / provider / applicant |
+| `status`     | active / suspended           |
+| `created_at` | Registration date            |
+
+If we're using Supabase, authentication itself should live in **Supabase Auth**, while `profiles` stores the application's user information.
+
+And **role authorization should not simply depend on editable frontend/user metadata**. We'll enforce it server/database-side.
+
+---
+
+# 2. Property Providers
+
+A user who wants to list property becomes a provider.
+
+### `provider_profiles`
+
+```text
+profiles
+   │
+   └── provider_profiles
+```
+
+Possible information:
+
+* Business/owner name
+* Provider type:
+
+  * Owner
+  * Agent
+  * Property manager
+* Phone
+* Address
+* Verification status
+* Identification information
+* Listing status
+* Agreement/terms acceptance
+
+Then we have the provider's payment.
+
+---
+
+# 3. Provider Listing Fee
+
+This is a separate concept from tenant payments.
+
+### `provider_payments`
+
+```text
+provider
+    │
+    └── provider_payments
+             │
+             ├── payment_method
+             ├── amount
+             ├── proof
+             └── verification_status
+```
+
+Flow:
+
+```text
+Provider registers
+       ↓
+Sees current listing fee
+       ↓
+Sees admin-configured payment instructions
+       ↓
+Pays externally
+       ↓
+Uploads payment proof
+       ↓
+PENDING
+       ↓
+Admin verifies
+       ↓
+VERIFIED
+       ↓
+Provider can submit properties
+```
+
+This means the listing fee should **not be hardcoded**.
+
+### `platform_settings`
+
+Could contain things like:
+
+```text
+listing_fee
+support_email
+support_phone
+whatsapp_number
+facebook_url
+payment_instructions
+faq_enabled
+```
+
+Or better, payment methods should have their own table.
+
+### `payment_methods`
+
+For example:
+
+```text
+Bank Transfer
+PayPal
+Other
+```
+
+Admin can enable/disable them and provide the relevant instructions.
+
+---
+
+# 4. Properties
+
+Now the core.
+
+### `properties`
+
+A property belongs to a provider.
+
+```text
+provider
+   │
+   └──────< properties
+```
+
+Example:
+
+```text
+Property:
+"Greenview Apartments"
+
+Provider:
+John Properties Ltd
+
+State:
+Oyo
+
+LGA:
+Ibadan North
+
+Area:
+Bodija
+
+Status:
+Pending Verification
+```
+
+Fields could include:
+
+* `id`
+* `provider_id`
+* `title`
+* `description`
+* `property_type`
+* `state_id`
+* `lga_id`
+* `area`
+* `address`
+* `latitude`
+* `longitude`
+* `status`
+* `verification_notes`
+* `verified_by`
+* `verified_at`
+* `created_at`
+
+### Property status
+
+I'd use something like:
+
+```text
+draft
+pending_verification
+approved
+rejected
+suspended
+archived
+```
+
+And **only `approved` properties are publicly visible.**
+
+That rule should exist at the database/query level too, not just in React.
+
+---
+
+# 5. Property Images
+
+Don't dump image URLs directly into the property table.
+
+Use:
+
+### `property_images`
+
+```text
+properties
+     │
+     └──────< property_images
+```
+
+Each property can have multiple images.
+
+```text
+property
+   ├── image 1
+   ├── image 2
+   ├── image 3
+   └── image 4
+```
+
+Fields:
+
+* `id`
+* `property_id`
+* `storage_path`
+* `is_primary`
+* `sort_order`
+
+This also works beautifully with Supabase Storage.
+
+---
+
+# 6. Property Units
+
+This is one of the things I strongly recommend we keep.
+
+Don't make:
+
+> "2-bedroom apartment — ₦1,500,000"
+
+just a text field.
+
+Instead:
+
+### `property_units`
+
+```text
+properties
+     │
+     └──────< property_units
+```
+
+Example:
+
+```text
+Greenview Apartments
+│
+├── Self Contained
+│     ├── ₦700k
+│     └── 3 available
+│
+├── 1 Bedroom
+│     ├── ₦1m
+│     └── 4 available
+│
+└── 2 Bedroom
+      ├── ₦1.5m
+      └── 2 available
+```
+
+Fields:
+
+* `id`
+* `property_id`
+* `unit_type`
+* `bedrooms`
+* `bathrooms`
+* `rent_amount`
+* `rent_period`
+* `available_quantity`
+* `description`
+* `status`
+
+This gives Blue Sky room to grow without rebuilding the database later.
+
+---
+
+# 7. Nigeria Location Structure
+
+Since they removed the four-state limit, **this becomes important.**
+
+I would NOT store:
+
+```text
+state = "Oyo"
+```
+
+as random text everywhere.
+
+Instead:
+
+```text
+states
+   │
+   └──< lgas
+          │
+          └──< areas
+```
+
+Then:
+
+```text
+property
+   ↓
+state
+   ↓
+LGA
+   ↓
+area
+```
+
+That gives us proper filtering.
+
+Eventually:
+
+> State → LGA → City/Area → Property
+
+And we can add more geographic structure later without redesigning properties.
+
+---
+
+# 8. Rental Applications
+
+This is another major entity.
+
+### `rental_applications`
+
+```text
+applicant
+     │
+     └──────< rental_applications >────── property
+                                             │
+                                             └── unit
+```
+
+Each application should capture:
+
+* Applicant
+* Property
+* Unit
+* Contact information
+* Application answers
+* Status
+* Admin notes
+* Submission date
+* Review date
+
+Status:
+
+```text
+draft
+submitted
+under_review
+approved
+rejected
+cancelled
+```
+
+---
+
+# 9. Applicant Verification
+
+I wouldn't put every ID/document directly inside `rental_applications`.
+
+Use:
+
+### `applicant_documents`
+
+```text
+applicant
+    │
+    └──────< applicant_documents
+```
+
+Examples:
+
+```text
+National ID
+Voter's Card
+Passport
+Driver's License
+Proof of Address
+Income Evidence
+Other
+```
+
+Each document can have:
+
+* document type
+* storage path
+* verification status
+* uploaded date
+* reviewed by
+* reviewed date
+* rejection reason
+
+And **these files should be private**.
+
+Public property images can be public/CDN-accessible.
+
+Applicant IDs absolutely should not be.
+
+---
+
+# 10. Applicant Credibility
+
+This deserves its own layer.
+
+Rather than pretending a voter's card automatically equals "credit check," we can model verification separately.
+
+### `applicant_verifications`
+
+```text
+application
+      │
+      └── applicant_verifications
+```
+
+Possible checks:
+
+```text
+identity
+residency
+income
+employment
+payment
+other
+```
+
+Each can have:
+
+```text
+pending
+verified
+failed
+not_required
+```
+
+That gives Blue Sky flexibility to define exactly what they require.
+
+---
+
+# 11. Application Payment
+
+Then:
+
+### `application_payments`
+
+This is completely separate from the **provider listing fee**.
+
+```text
+rental_application
+        │
+        └──────< application_payments
+```
+
+For example:
+
+```text
+Application
+   ↓
+Payment required
+   ↓
+Applicant pays externally
+   ↓
+Uploads proof
+   ↓
+Admin verifies
+```
+
+So now we have two independent payment concepts:
+
+```text
+Provider listing fee
+        ↓
+provider_payments
+
+
+Tenant/application payment
+        ↓
+application_payments
+```
+
+That's much cleaner.
+
+---
+
+# 12. Messaging
+
+For the inquiry system:
+
+### `conversations`
+
+```text
+user
+ │
+ └────< conversations >──── property
+```
+
+And:
+
+### `messages`
+
+```text
+conversation
+      │
+      └──────< messages
+```
+
+Example:
+
+```text
+Customer
+   ↓
+"Is the 2-bedroom still available?"
+   ↓
+Conversation
+   ↓
+Admin
+   ↓
+"Yes, it is currently available."
+```
+
+This gives us a proper messaging history instead of random contact forms.
+
+---
+
+# 13. FAQ / Keyword Responses
+
+We can keep this hilariously simple. 😂
+
+### `faqs`
+
+```text
+question
+answer
+keywords
+is_active
+```
+
+Example:
+
+```text
+Question:
+How do I apply?
+
+Keywords:
+apply, application, rent, interested
+
+Answer:
+Click the Apply button...
+```
+
+When a message arrives:
+
+```text
+Message
+  ↓
+Keyword matching
+  ↓
+Match found?
+ ├── YES → automatic FAQ response
+ │
+ └── NO → Admin inbox
+```
+
+No AI.
+
+No LLM.
+
+No unnecessary "AI-powered intelligent property assistant" nonsense.
+
+Just deterministic rules.
+
+---
+
+# 14. Admin Verification Architecture
+
+This is where I'd introduce an **audit log**.
+
+### `verification_actions`
+
+Whenever an admin does something important:
+
+```text
+Admin approved property
+Admin rejected property
+Admin verified payment
+Admin approved applicant
+Admin rejected applicant
+Admin suspended provider
+```
+
+Record:
+
+```text
+admin_id
+entity_type
+entity_id
+action
+reason
+created_at
+```
+
+That gives Blue Sky an actual history of who did what.
+
+Very useful when someone inevitably says:
+
+> "Who rejected my property?"
+
+😌
+
+---
+
+# 🔥 Final Relationship Map
+
+The core database becomes roughly:
+
+```text
+                         profiles
+                            │
+             ┌──────────────┼───────────────┐
+             │              │               │
+          admins         providers       applicants
+             │              │               │
+             │              │               │
+             │       provider_payments      │
+             │              │               │
+             │              ↓               │
+             │         properties            │
+             │              │                │
+             │        ┌─────┴─────┐          │
+             │        │           │          │
+             │   property_images  units      │
+             │        │           │          │
+             │        │           └────┐     │
+             │        │                │     │
+             │        └────────────────┼─────┤
+             │                         │     │
+             │                    applications
+             │                         │
+             │               ┌─────────┼─────────┐
+             │               │         │         │
+             │          documents   payments  verification
+             │
+             ├──────────── conversations
+             │                    │
+             │                 messages
+             │
+             └────────────── verification_actions
+
+locations:
+states
+  ↓
+lgas
+  ↓
+areas
+  ↓
+properties
+```
+
+## One important architectural decision
+
+I'd make **property verification and application verification two completely independent workflows.**
+
+A verified property does **not** mean every applicant gets approved.
+
+And a verified applicant does **not** mean they can apply to every property.
+
+So:
+
+```text
+PROPERTY
+Provider → Payment verification → Property verification → Published
+
+APPLICANT
+Applicant → Identity/credibility verification → Application review → Approved
+```
+
+That's the backbone of Blue Sky.
+
+### Recommended stack
+
+Given the type of system we're building, I'd use:
+
+**Frontend**
+
+* React / Next.js
+* Tailwind
+* Framer Motion where useful
+
+**Backend**
+
+* Supabase
+* PostgreSQL
+* Supabase Auth
+* Supabase Storage
+* Edge Functions where privileged/server-side logic is needed
+
+**Core security**
+
+* RLS on every exposed table
+* Private storage buckets for applicant documents/payment proofs
+* Admin-only operations enforced server/database-side
+* Never expose service-role credentials to the browser
+
+That security piece is particularly important here because we're dealing with **identity documents, payment proofs, applicant information, and potentially financial information**. Supabase's current guidance also emphasizes RLS for exposed tables and careful handling of authorization/storage.
+
+And now that Blue Sky is nationwide, the architecture is **future-proof for all 36 states + FCT** without changing the property schema later.
+
+**Next step:** I would turn this into the actual **PostgreSQL schema/ERD**, including every table, column, primary key, foreign key, enum/status, indexes, and the RLS access model. That's where we can get precise enough to start building without painting ourselves into a database-shaped corner.
+
+I want to make sure that we have enough information, like, we have enough, when I mean enough, we have enough information to start building this system. And also, we should turn this into the actual schema, including every table, columns, and primary key, foreign key, enum status, index, and others. So I want us to have all the backend structure already. I want us to have them ready. And then the front end will just be a piece of cake. So with all this information, we are going to create the design. So you are going to create the design. Well, we are going to generate the design image, but not now. But we need to have all the information first.
+Yes, buddy. **We have enough functional information to start building Blue Sky.** But I want to make one distinction:
+
+> We have enough to design and build the **system architecture**, but we should not pretend every business rule has been decided yet.
+
+The remaining unknowns should be turned into **configurable settings**, not blockers. That way we're not waiting for the client to tell us whether the listing fee is ₦X or ₦Y before we can build the database.
+
+And I agree with your strategy: **backend/data architecture first → system logic → then UI/design.** Once that foundation is solid, the frontend becomes mostly "put the right controls on the right screens." 😎
+
+---
+
+# Blue Sky — Backend Blueprint v1
+
+## 1. What we're building
+
+Blue Sky Property Management is a:
+
+**Verified rental-property marketplace and rental application management platform.**
+
+It supports:
+
+* Property owners/agents registering
+* One-time listing-fee payment
+* Payment-proof verification
+* Property submission
+* Admin property verification
+* Nationwide Nigerian property listings
+* Property/unit management
+* Property search/filtering
+* Rental applications
+* Applicant identity/credibility verification
+* Applicant document uploads
+* Application/payment-proof verification
+* Admin/customer messaging
+* FAQ/keyword responses
+* Admin management
+* Platform settings
+* Audit history
+
+No property sales.
+
+No AI chatbot.
+
+No integrated payment gateway for now.
+
+No four-state restriction anymore.
+
+---
+
+# 2. Core actors
+
+We have three primary roles:
+
+```text
+ADMIN
+  └── Controls platform
+
+PROVIDER
+  └── Owner / Agent / Property Manager
+      └── Pays listing fee
+      └── Submits properties
+
+APPLICANT
+  └── Searches properties
+      └── Applies for rental
+      └── Provides verification information
+```
+
+We should also distinguish **authentication** from **business roles**.
+
+Supabase Auth handles:
+
+* email/password
+* session
+* password reset
+* authentication
+
+Our database handles:
+
+* admin/provider/applicant
+* account status
+* profile information
+* verification status
+
+---
+
+# 3. Final table inventory
+
+This is the structure I'd lock as **Blue Sky Database v1**.
+
+### Identity
+
+1. `profiles`
+2. `provider_profiles`
+3. `applicant_profiles`
+
+### Locations
+
+4. `states`
+5. `lgas`
+6. `areas`
+
+### Properties
+
+7. `properties`
+8. `property_images`
+9. `property_units`
+10. `property_amenities`
+
+### Provider billing
+
+11. `payment_methods`
+12. `provider_payments`
+
+### Rental applications
+
+13. `rental_applications`
+14. `application_documents`
+15. `application_payments`
+16. `application_verifications`
+
+### Communication
+
+17. `conversations`
+18. `messages`
+19. `faqs`
+
+### Platform
+
+20. `platform_settings`
+21. `notifications`
+22. `audit_logs`
+
+That's a good-sized schema without becoming database spaghetti.
+
+---
+
+# 4. `profiles`
+
+The central user table.
+
+```text
+profiles
+---------
+id              UUID PK
+email           TEXT UNIQUE
+phone           TEXT
+full_name       TEXT
+role            user_role
+status          user_status
+avatar_url      TEXT NULL
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+### Enum: `user_role`
+
+```text
+admin
+provider
+applicant
+```
+
+### Enum: `user_status`
+
+```text
+active
+suspended
+deactivated
+```
+
+`id` corresponds to the Supabase Auth user's ID.
+
+---
+
+# 5. `provider_profiles`
+
+Additional information about property owners/agents.
+
+```text
+provider_profiles
+-----------------
+id                  UUID PK
+user_id             UUID FK → profiles.id UNIQUE
+provider_type       provider_type
+business_name       TEXT NULL
+business_phone      TEXT
+business_address    TEXT NULL
+verification_status verification_status
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `provider_type`
+
+```text
+owner
+agent
+property_manager
+company
+```
+
+We don't necessarily need every option immediately, but having the type lets the platform distinguish them.
+
+---
+
+# 6. `applicant_profiles`
+
+Information belonging to the person applying for rentals.
+
+```text
+applicant_profiles
+------------------
+id                  UUID PK
+user_id             UUID FK → profiles.id UNIQUE
+date_of_birth       DATE NULL
+nationality         TEXT NULL
+state_of_residence  UUID FK → states.id NULL
+address             TEXT NULL
+occupation          TEXT NULL
+employer            TEXT NULL
+monthly_income      NUMERIC NULL
+verification_status verification_status
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### Important
+
+We should **not call a voter's card a credit check**.
+
+There are different concepts:
+
+```text
+Identity verification
+Residency verification
+Income verification
+Financial/rental capability
+Credit check
+```
+
+Blue Sky currently wants credibility/security verification. We can support those categories without pretending we're connected to an actual credit bureau.
+
+---
+
+# 7. Locations
+
+Because Blue Sky is now nationwide:
+
+```text
+states
+------
+id UUID PK
+name TEXT UNIQUE
+code TEXT UNIQUE
+```
+
+```text
+lgas
+----
+id UUID PK
+state_id UUID FK → states.id
+name TEXT
+```
+
+Unique:
+
+```text
+(state_id, name)
+```
+
+Then:
+
+```text
+areas
+-----
+id UUID PK
+lga_id UUID FK → lgas.id
+name TEXT
+```
+
+Unique:
+
+```text
+(lga_id, name)
+```
+
+So:
+
+```text
+Nigeria
+  ↓
+State
+  ↓
+LGA
+  ↓
+Area
+  ↓
+Property
+```
+
+This is much better than storing random `"Lagos"` or `"Ibadan"` strings everywhere.
+
+---
+
+# 8. `properties`
+
+The main property entity.
+
+```text
+properties
+----------
+id                  UUID PK
+provider_id         UUID FK → provider_profiles.id
+title               TEXT
+slug                TEXT UNIQUE
+description         TEXT
+property_type       property_type
+
+state_id            UUID FK → states.id
+lga_id              UUID FK → lgas.id
+area_id             UUID FK → areas.id
+address             TEXT
+
+latitude            NUMERIC NULL
+longitude           NUMERIC NULL
+
+status              property_status
+
+verification_notes  TEXT NULL
+verified_by         UUID FK → profiles.id NULL
+verified_at         TIMESTAMPTZ NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+published_at        TIMESTAMPTZ NULL
+```
+
+### `property_type`
+
+Something like:
+
+```text
+apartment
+house
+flat
+self_contained
+duplex
+studio
+office
+shop
+commercial
+other
+```
+
+We can adjust this according to Blue Sky's actual property categories.
+
+### `property_status`
+
+```text
+draft
+pending_verification
+approved
+rejected
+suspended
+archived
+```
+
+**Only `approved` properties can appear publicly.**
+
+That is a fundamental business rule.
+
+---
+
+# 9. `property_images`
+
+```text
+property_images
+---------------
+id              UUID PK
+property_id     UUID FK → properties.id
+storage_path    TEXT
+is_primary      BOOLEAN
+sort_order      INTEGER
+created_at      TIMESTAMPTZ
+```
+
+Images should live in storage.
+
+The database stores their metadata/path.
+
+---
+
+# 10. `property_units`
+
+This is important.
+
+A property may contain multiple rental options.
+
+```text
+property_units
+--------------
+id                  UUID PK
+property_id         UUID FK → properties.id
+
+name                TEXT
+unit_type           unit_type
+bedrooms            INTEGER
+bathrooms           INTEGER NULL
+
+rent_amount         NUMERIC
+rent_period         rent_period
+
+available_quantity  INTEGER
+status              unit_status
+
+description         TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Example:
+
+```text
+Greenview Apartments
+│
+├── Self Contained
+│   └── ₦700,000/year
+│
+├── 1 Bedroom
+│   └── ₦1,000,000/year
+│
+└── 2 Bedroom
+    └── ₦1,500,000/year
+```
+
+### `unit_type`
+
+```text
+self_contained
+studio
+one_bedroom
+two_bedroom
+three_bedroom
+four_plus_bedroom
+other
+```
+
+### `rent_period`
+
+```text
+monthly
+quarterly
+biannual
+annual
+custom
+```
+
+### `unit_status`
+
+```text
+available
+unavailable
+fully_occupied
+suspended
+```
+
+---
+
+# 11. `property_amenities`
+
+Instead of storing:
+
+```text
+amenities = "water, parking, security, electricity"
+```
+
+we can normalize it.
+
+```text
+property_amenities
+------------------
+id UUID PK
+name TEXT UNIQUE
+```
+
+And a junction table:
+
+```text
+property_amenity_links
+----------------------
+property_id UUID FK
+amenity_id  UUID FK
+
+PRIMARY KEY(property_id, amenity_id)
+```
+
+This is cleaner for filtering.
+
+For example:
+
+> Show me properties with parking + security.
+
+---
+
+# 12. Payment system
+
+We deliberately separate **payment methods** from **payments**.
+
+### `payment_methods`
+
+```text
+payment_methods
+---------------
+id                  UUID PK
+name                TEXT
+type                payment_method_type
+instructions        TEXT
+account_name        TEXT NULL
+account_number      TEXT NULL
+bank_name           TEXT NULL
+paypal_email        TEXT NULL
+is_active           BOOLEAN
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Blue Sky can configure whichever methods it actually accepts.
+
+No gateway integration required.
+
+---
+
+# 13. `provider_payments`
+
+This handles the one-time property-listing fee.
+
+```text
+provider_payments
+-----------------
+id                  UUID PK
+provider_id         UUID FK → provider_profiles.id
+payment_method_id   UUID FK → payment_methods.id
+
+amount              NUMERIC
+proof_path          TEXT
+
+status              payment_status
+
+submitted_at        TIMESTAMPTZ
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `payment_status`
+
+```text
+pending
+verified
+rejected
+```
+
+Workflow:
+
+```text
+REGISTER
+   ↓
+PAY LISTING FEE
+   ↓
+UPLOAD PROOF
+   ↓
+ADMIN VERIFIES
+   ↓
+PROVIDER UNLOCKED
+   ↓
+SUBMIT PROPERTY
+```
+
+---
+
+# 14. `rental_applications`
+
+```text
+rental_applications
+-------------------
+id                  UUID PK
+
+applicant_id        UUID FK → applicant_profiles.id
+property_id         UUID FK → properties.id
+unit_id             UUID FK → property_units.id
+
+status              application_status
+
+message             TEXT NULL
+admin_notes         TEXT NULL
+
+submitted_at        TIMESTAMPTZ
+reviewed_at         TIMESTAMPTZ NULL
+reviewed_by         UUID FK → profiles.id NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `application_status`
+
+```text
+draft
+submitted
+under_review
+approved
+rejected
+cancelled
+```
+
+---
+
+# 15. `application_documents`
+
+Private applicant documents.
+
+```text
+application_documents
+---------------------
+id                  UUID PK
+application_id      UUID FK → rental_applications.id
+
+document_type       document_type
+storage_path        TEXT
+
+status              document_status
+
+reviewed_by         UUID FK → profiles.id NULL
+reviewed_at         TIMESTAMPTZ NULL
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+```
+
+### `document_type`
+
+```text
+national_id
+voters_card
+passport
+drivers_license
+proof_of_address
+income_proof
+employment_proof
+other
+```
+
+### `document_status`
+
+```text
+pending
+verified
+rejected
+```
+
+These files should live in a **private storage bucket**.
+
+---
+
+# 16. `application_verifications`
+
+```text
+application_verifications
+-------------------------
+id                  UUID PK
+application_id      UUID FK → rental_applications.id
+
+verification_type   verification_type
+status              verification_status
+
+notes               TEXT NULL
+
+verified_by         UUID FK → profiles.id NULL
+verified_at         TIMESTAMPTZ NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `verification_type`
+
+```text
+identity
+residency
+income
+employment
+financial_capability
+other
+```
+
+This gives us room to evolve Blue Sky's verification process without rebuilding applications.
+
+---
+
+# 17. `application_payments`
+
+If an application requires payment/proof:
+
+```text
+application_payments
+--------------------
+id                  UUID PK
+application_id      UUID FK → rental_applications.id
+payment_method_id   UUID FK → payment_methods.id
+
+amount              NUMERIC
+proof_path          TEXT
+
+status              payment_status
+
+submitted_at        TIMESTAMPTZ
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Again:
+
+**No payment gateway.**
+
+Just:
+
+```text
+Payment instruction
+        ↓
+External payment
+        ↓
+Upload proof
+        ↓
+Admin verification
+```
+
+---
+
+# 18. Messaging
+
+### `conversations`
+
+```text
+conversations
+-------------
+id              UUID PK
+property_id     UUID FK → properties.id NULL
+applicant_id    UUID FK → profiles.id NULL
+status          conversation_status
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+### `messages`
+
+```text
+messages
+--------
+id              UUID PK
+conversation_id UUID FK → conversations.id
+sender_id       UUID FK → profiles.id NULL
+
+message         TEXT
+is_automated    BOOLEAN
+
+created_at      TIMESTAMPTZ
+read_at         TIMESTAMPTZ NULL
+```
+
+The `is_automated` field lets us distinguish:
+
+> Admin: "Yes, the apartment is available."
+
+from:
+
+> Blue Sky FAQ: "Applications require..."
+
+---
+
+# 19. FAQ system
+
+### `faqs`
+
+```text
+faqs
+----
+id              UUID PK
+question        TEXT
+answer          TEXT
+keywords        TEXT[]
+is_active       BOOLEAN
+priority        INTEGER
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+Simple keyword matching.
+
+No AI.
+
+---
+
+# 20. `platform_settings`
+
+This is where we make the system configurable.
+
+```text
+platform_settings
+-----------------
+id              UUID PK
+key             TEXT UNIQUE
+value           JSONB
+updated_by      UUID FK → profiles.id
+updated_at      TIMESTAMPTZ
+```
+
+Possible settings:
+
+```text
+listing_fee
+support_email
+support_phone
+whatsapp_number
+facebook_url
+company_address
+application_fee
+required_documents
+payment_instructions
+```
+
+This means if Blue Sky says tomorrow:
+
+> "Change our listing fee."
+
+We don't modify code.
+
+Admin changes the setting.
+
+---
+
+# 21. Notifications
+
+### `notifications`
+
+```text
+notifications
+-------------
+id              UUID PK
+user_id         UUID FK → profiles.id
+type            notification_type
+title           TEXT
+message         TEXT
+data            JSONB NULL
+is_read         BOOLEAN
+created_at      TIMESTAMPTZ
+```
+
+Examples:
+
+```text
+Property approved
+Property rejected
+Payment verified
+Application received
+Application approved
+Application rejected
+New message
+```
+
+---
+
+# 22. Audit logs
+
+This is something I definitely want in this project.
+
+### `audit_logs`
+
+```text
+audit_logs
+----------
+id              UUID PK
+
+actor_id        UUID FK → profiles.id
+action          TEXT
+
+entity_type     TEXT
+entity_id       UUID
+
+old_data        JSONB NULL
+new_data        JSONB NULL
+
+ip_address      INET NULL
+
+created_at      TIMESTAMPTZ
+```
+
+So if an admin rejects a property:
+
+```text
+Admin: John
+Action: property.rejected
+Property: 7a8...
+Reason: Duplicate listing
+Time: 2026-...
+```
+
+Beautiful.
+
+---
+
+# 23. Index strategy
+
+We're not just creating tables and praying to PostgreSQL. 😂
+
+Important indexes:
+
+### Properties
+
+```text
+properties(provider_id)
+properties(status)
+properties(state_id)
+properties(lga_id)
+properties(area_id)
+properties(property_type)
+properties(created_at)
+```
+
+Potential composite:
+
+```text
+properties(status, state_id)
+properties(status, property_type)
+```
+
+Because the public site will frequently ask:
+
+> Give me approved apartments in Oyo.
+
+---
+
+### Units
+
+```text
+property_units(property_id)
+property_units(status)
+property_units(unit_type)
+```
+
+### Applications
+
+```text
+rental_applications(applicant_id)
+rental_applications(property_id)
+rental_applications(unit_id)
+rental_applications(status)
+rental_applications(created_at)
+```
+
+### Payments
+
+```text
+provider_payments(provider_id)
+provider_payments(status)
+
+application_payments(application_id)
+application_payments(status)
+```
+
+### Messages
+
+```text
+messages(conversation_id)
+messages(sender_id)
+messages(created_at)
+```
+
+### Notifications
+
+```text
+notifications(user_id, is_read)
+notifications(created_at)
+```
+
+---
+
+# 24. The most important RLS boundaries
+
+Because we're using Supabase, this isn't optional.
+
+### Public/anonymous
+
+Can see:
+
+```text
+approved properties
+approved property images
+available units
+public locations
+public amenities
+active FAQs
+public platform information
+```
+
+Cannot see:
+
+```text
+applicant documents
+payment proofs
+applications
+private messages
+provider payments
+audit logs
+```
+
+### Provider
+
+Can:
+
+```text
+view own profile
+edit own profile
+submit properties
+view own properties
+view own payment records
+upload property images
+manage own drafts
+```
+
+Cannot:
+
+```text
+approve own property
+approve own payment
+see another provider's private information
+see applicants' documents
+access admin data
+```
+
+### Applicant
+
+Can:
+
+```text
+manage own profile
+view public properties
+create own applications
+upload own documents
+view own application
+view own application payments
+send messages
+```
+
+Cannot:
+
+```text
+modify approval status
+view another applicant
+view another applicant's documents
+view provider payment records
+access admin functions
+```
+
+### Admin
+
+Full management access.
+
+But even admin actions should be audited.
+
+---
+
+# 25. The complete business flow
+
+Now we can finally see the entire machine:
+
+```text
+                    PROVIDER
+                       │
+                    Register
+                       ↓
+                Pay listing fee
+                       ↓
+              Upload payment proof
+                       ↓
+                ADMIN VERIFICATION
+                  ↙           ↘
+              Reject          Verify
+                               ↓
+                       Submit property
+                               ↓
+                       ADMIN VERIFICATION
+                         ↙          ↘
+                     Reject       Approve
+                                    ↓
+                              PUBLIC LISTING
+                                    │
+                                    ↓
+                                APPLICANT
+                                    ↓
+                              Select property
+                                    ↓
+                              Select unit
+                                    ↓
+                               Apply
+                                    ↓
+                          Upload information
+                                    ↓
+                         Upload documents
+                                    ↓
+                         Payment if required
+                                    ↓
+                          Upload proof
+                                    ↓
+                           ADMIN REVIEW
+                          ↙            ↘
+                      Reject         Approve
+                                      ↓
+                              RENTAL APPROVED
+```
+
+And independently:
+
+```text
+Applicant
+   ↓
+Message
+   ↓
+FAQ keyword match
+   ├── Match → automated response
+   │
+   └── No match → Admin
+```
+
+---
+
+# Are we actually ready?
+
+### Functionally: **YES.**
+
+### Database architecture: **YES.**
+
+### Backend architecture: **YES.**
+
+### Frontend design: **Not yet — intentionally.**
+
+There are a handful of **business values** we haven't received from the client yet:
+
+| Decision                                         | Current approach                |
+| ------------------------------------------------ | ------------------------------- |
+| Listing fee amount                               | Admin configurable              |
+| Application fee                                  | Admin configurable / optional   |
+| Accepted payment methods                         | Admin configurable              |
+| Required applicant documents                     | Admin configurable              |
+| Exact property categories                        | Configurable/extendable         |
+| Exact verification rules                         | Admin workflow                  |
+| Exact FAQ questions                              | Admin-managed                   |
+| Notification channels                            | Start with in-app; expand later |
+| Rental duration rules                            | Stored per unit                 |
+| Exact Nigerian location dataset                  | Seed states/LGAs/areas          |
+| Whether providers can edit approved listings     | Admin-controlled workflow       |
+| Whether applicants need accounts before applying | **Still a UX decision**         |
+
+That last one is probably the only thing I'd explicitly settle before implementation because it affects authentication flow.
+
+---
+
+## And here's the big picture
+
+We're now at the point where **we shouldn't keep brainstorming random features**.
+
+The next artifact should be the **Blue Sky Technical Specification v1**, containing:
+
+1. Final ERD
+2. Complete SQL schema
+3. All enums
+4. All constraints
+5. All indexes
+6. Foreign-key behavior
+7. RLS policies
+8. Storage buckets and policies
+9. Auth/role architecture
+10. Database triggers/functions where needed
+11. Admin workflows
+12. Provider workflows
+13. Applicant workflows
+14. API/data-access structure
+15. Seed data
+16. Validation rules
+17. Security rules
+18. Frontend route/page map
+19. Admin dashboard structure
+20. Final design requirements
+
+**That becomes our source of truth.**
+
+Then we generate the UI/design from that specification rather than designing pretty screens first and discovering three weeks later that the database has no idea what the pretty buttons are supposed to do. 😂
+
+And yes — **we should create the design images only after this specification is locked.** That's the right order.
+
+Yeah, I just get useful information now. So the guy said for those property owners that want to list their property, so depending on the amount and the admin put there that they will pay for, before they can list. So there will be a deadline when, once they pay, then they can list as much property they have. So when the admin approve, once the admin approve those properties and they display, so there will be a deadline which will show that, okay, at this deadline, before payment, it will be, they will tell those, it will be transparent to them that, okay, once you pay this fee, you are paying for this whole time. Once this time exists, your property will be unlisted unless you renew, just like a monthly subscription. But he said it's not monthly subscription. Like, the admin will be able to control that when the time of listing will expire.
+Ahhh — **that changes the provider side significantly**, and I'm glad we caught it before writing the SQL. This is not a one-time listing fee anymore.
+
+It is better modeled as a **listing access period**.
+
+The provider pays for a period, and during that period they can list **as many properties as they want**. When the period expires, their properties automatically stop appearing publicly until they renew.
+
+So we need to update the backend design.
+
+---
+
+# 🔄 New Provider Listing Model
+
+Instead of:
+
+```text
+Provider
+   ↓
+Pay listing fee
+   ↓
+Can list properties forever
+```
+
+we now have:
+
+```text
+Provider
+   ↓
+Choose listing period
+   ↓
+Pay fee
+   ↓
+Admin verifies payment
+   ↓
+Listing period activated
+   ↓
+Can list unlimited properties
+   ↓
+Period expires
+   ↓
+All provider listings become hidden
+   ↓
+Provider renews
+   ↓
+Listings become visible again
+```
+
+And importantly:
+
+> **It is not a monthly subscription.**
+
+It's a **time-bound listing package/access period** controlled by Blue Sky.
+
+For example, the admin could configure:
+
+| Package                 |    Price | Duration |
+| ----------------------- | -------: | -------: |
+| Basic Listing Access    |  ₦50,000 |  30 days |
+| Extended Listing Access | ₦100,000 |  90 days |
+| Premium Listing Access  | ₦200,000 | 180 days |
+
+Those are just examples — **we don't hard-code any of those values.**
+
+---
+
+# 🧱 Database changes
+
+I'd now add **two important tables**.
+
+## 1. `listing_plans`
+
+This is controlled by the admin.
+
+```text
+listing_plans
+-------------
+id                  UUID PK
+name                TEXT
+description         TEXT NULL
+
+price               NUMERIC
+duration_days       INTEGER
+
+is_active           BOOLEAN
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+So the admin can create:
+
+```text
+"90-Day Property Listing"
+price: ₦X
+duration: 90 days
+```
+
+or later change it to:
+
+```text
+"6-Month Property Listing"
+price: ₦Y
+duration: 180 days
+```
+
+No code change required.
+
+---
+
+# 2. `provider_listing_periods`
+
+This is the **actual entitlement** the provider receives after payment.
+
+```text
+provider_listing_periods
+------------------------
+id                  UUID PK
+
+provider_id         UUID FK → provider_profiles.id
+listing_plan_id     UUID FK → listing_plans.id
+payment_id          UUID FK → provider_payments.id
+
+starts_at           TIMESTAMPTZ
+expires_at          TIMESTAMPTZ
+
+status              listing_period_status
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `listing_period_status`
+
+```text
+pending
+active
+expired
+cancelled
+```
+
+---
+
+# 🔥 The key relationship
+
+Now we have:
+
+```text
+Provider
+   │
+   ├──────< Listing Periods
+   │                │
+   │                └── Listing Plan
+   │
+   └──────< Properties
+```
+
+The provider doesn't purchase individual property slots.
+
+They purchase **listing access**.
+
+---
+
+# Example
+
+Let's say John is an agent.
+
+He purchases:
+
+> **90-Day Listing Access — ₦100,000**
+
+Payment gets verified on:
+
+**August 20, 2026**
+
+Then:
+
+```text
+starts_at  = Aug 20, 2026
+expires_at = Nov 18, 2026
+```
+
+During that period:
+
+```text
+John
+ │
+ ├── Property A
+ ├── Property B
+ ├── Property C
+ ├── Property D
+ ├── Property E
+ └── ... unlimited
+```
+
+No additional listing payment.
+
+---
+
+# ⏰ What happens when the period expires?
+
+This is where we need to be clever.
+
+We **shouldn't physically delete or permanently reject the properties**.
+
+Their property records remain.
+
+Instead, public visibility becomes conditional:
+
+```text
+Property approved
+        AND
+Provider has active listing period
+        ↓
+      PUBLIC
+```
+
+If:
+
+```text
+expires_at < NOW()
+```
+
+then:
+
+```text
+NOT PUBLIC
+```
+
+The property remains in the provider's dashboard.
+
+So the provider sees:
+
+> **Your listing access expired on November 18. Renew to republish your properties.**
+
+That's much better than deleting anything.
+
+---
+
+# 🟢 Renewal
+
+Suppose John renews on December 1.
+
+He pays for another 90 days.
+
+A new:
+
+`provider_listing_period`
+
+is created.
+
+```text
+Period #1
+Aug 20 → Nov 18
+EXPIRED
+
+
+Period #2
+Dec 1 → Feb 28
+ACTIVE
+```
+
+His previously approved properties can become visible again.
+
+We don't need him to upload everything again.
+
+---
+
+# One subtle issue: what if he renews before expiry?
+
+We should support that too.
+
+Example:
+
+```text
+Current period:
+Aug 20 → Nov 18
+```
+
+John renews on:
+
+**Nov 10**
+
+We shouldn't make his new period:
+
+```text
+Nov 10 → Feb 7
+```
+
+because he'd lose eight days.
+
+Instead:
+
+```text
+Current:
+Aug 20 → Nov 18
+
+Renewal:
+Nov 19 → Feb 16
+```
+
+So the system should calculate:
+
+```text
+new_start =
+    current_active_period.expires_at
+```
+
+when renewing early.
+
+That gives providers the full value they paid for.
+
+---
+
+# 💰 Provider payment now becomes
+
+Our previous `provider_payments` table should be adjusted.
+
+```text
+provider_payments
+-----------------
+id                  UUID PK
+
+provider_id         UUID FK → provider_profiles.id
+listing_plan_id     UUID FK → listing_plans.id
+payment_method_id   UUID FK → payment_methods.id
+
+amount              NUMERIC
+proof_path          TEXT
+
+status              payment_status
+
+submitted_at        TIMESTAMPTZ
+
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Then:
+
+```text
+provider_payment
+       │
+       ↓
+provider_listing_period
+```
+
+A verified payment generates/activates the provider's listing period.
+
+---
+
+# 🔐 Public listing rule
+
+This is now one of the **most important backend rules in the entire application**.
+
+A property is publicly visible only when:
+
+```text
+property.status = 'approved'
+AND
+property.provider has an active listing period
+AND
+listing_period.expires_at > NOW()
+```
+
+So imagine:
+
+```text
+Property:
+Approved ✅
+
+Provider:
+Listing period expired ❌
+
+Result:
+HIDDEN
+```
+
+Then:
+
+```text
+Provider renews
+        ↓
+Listing period active ✅
+        ↓
+Property approved ✅
+        ↓
+Property becomes PUBLIC again
+```
+
+That's clean.
+
+---
+
+# 📅 Admin controls everything
+
+The admin dashboard should have something like:
+
+### Listing Plans
+
+```text
+┌─────────────────────────────────────┐
+│ Listing Plans                       │
+├─────────────────────────────────────┤
+│ 30 Days       ₦_____      Active    │
+│ 90 Days       ₦_____      Active    │
+│ 180 Days      ₦_____      Active    │
+│                                     │
+│             + Add Plan              │
+└─────────────────────────────────────┘
+```
+
+Admin can:
+
+* Create plan
+* Edit price
+* Edit duration
+* Activate/deactivate plan
+* View providers using the plan
+* View active/expired periods
+
+---
+
+# Provider dashboard
+
+The provider should see something like:
+
+```text
+LISTING ACCESS
+
+Status:
+🟢 ACTIVE
+
+Expires:
+18 November 2026
+
+Days remaining:
+91
+
+Properties:
+12
+
+[ Renew Listing Access ]
+```
+
+And when expired:
+
+```text
+LISTING ACCESS
+
+🔴 EXPIRED
+
+Expired:
+18 November 2026
+
+Your properties are currently hidden
+from the public.
+
+[ Renew Now ]
+```
+
+That makes the business model very transparent.
+
+---
+
+# 🚨 One more thing we should add
+
+Because expiration is now central to the business model, we should add **listing expiration notifications**.
+
+For example:
+
+```text
+30 days remaining
+      ↓
+Notification
+
+14 days remaining
+      ↓
+Notification
+
+7 days remaining
+      ↓
+Notification
+
+3 days remaining
+      ↓
+Notification
+
+1 day remaining
+      ↓
+Notification
+
+Expired
+      ↓
+Notification
+```
+
+We don't necessarily need email/WhatsApp on day one.
+
+The database can support notifications, and we can later add:
+
+* Email
+* WhatsApp
+* SMS
+
+without redesigning the core architecture.
+
+---
+
+# 🧠 Updated architecture
+
+So the provider side is now:
+
+```text
+                    PROVIDER
+                       │
+                    Register
+                       │
+                       ▼
+                Choose Listing Plan
+                       │
+                       ▼
+                  Make Payment
+                       │
+                       ▼
+              Upload Payment Proof
+                       │
+                       ▼
+                Admin Verification
+                  /           \
+              Reject          Verify
+                                │
+                                ▼
+                    Listing Period ACTIVE
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+              Submit Property          Submit Property
+                    │                       │
+                    ▼                       ▼
+              Admin Verifies           Admin Verifies
+                    │                       │
+                    └───────────┬───────────┘
+                                ▼
+                         APPROVED PROPERTY
+                                │
+                                ▼
+                       PUBLICLY VISIBLE
+                                │
+                                ▼
+                         PERIOD EXPIRES
+                                │
+                                ▼
+                         HIDDEN FROM PUBLIC
+                                │
+                                ▼
+                              RENEW
+                                │
+                                ▼
+                       PUBLIC AGAIN
+```
+
+### So our final provider hierarchy is now:
+
+```text
+profiles
+   ↓
+provider_profiles
+   ├── provider_payments
+   │        ↓
+   │   listing_plans
+   │
+   ├── provider_listing_periods
+   │
+   └── properties
+            ├── property_images
+            ├── property_units
+            └── property_amenities
+```
+
+**This is a much better model than the original one.**
+
+And importantly, it gives Blue Sky a proper monetization engine rather than a crude "pay once to upload" mechanism.
+
+I would now consider the **provider billing/listing lifecycle sufficiently defined** for our final technical specification. We can incorporate this into the complete schema before we generate the SQL/ERD.
+
+All right, buddy, let's incorporate this into the, uh, into the complete schema and the architecture.
+Absolutely. Let's **lock the revised Blue Sky architecture** with the new time-based provider listing model included.
+
+This should now become our **Blue Sky Property Management Technical Blueprint v1.1** — the source of truth we'll use before touching the actual implementation.
+
+---
+
+# 🏢 Blue Sky Property Management
+
+## Backend Architecture & Database Schema v1.1
+
+### Core business model
+
+Blue Sky is a **verified rental-property marketplace**.
+
+There are three major actors:
+
+```text
+ADMIN
+ ├── manages platform
+ ├── verifies providers
+ ├── verifies payments
+ ├── verifies properties
+ ├── reviews applications
+ └── manages communication
+
+PROVIDER
+ ├── registers
+ ├── purchases listing access
+ ├── submits unlimited properties during active period
+ └── manages their own listings
+
+APPLICANT
+ ├── browses properties
+ ├── applies for rental
+ ├── submits verification documents
+ ├── submits payment proof where required
+ └── communicates with Blue Sky
+```
+
+The platform is **nationwide**, not limited to four states.
+
+---
+
+# 1. Complete table structure
+
+We're now looking at **23 tables**:
+
+### Identity
+
+1. `profiles`
+2. `provider_profiles`
+3. `applicant_profiles`
+
+### Location
+
+4. `states`
+5. `lgas`
+6. `areas`
+
+### Provider monetization
+
+7. `listing_plans`
+8. `provider_payments`
+9. `provider_listing_periods`
+10. `payment_methods`
+
+### Properties
+
+11. `properties`
+12. `property_images`
+13. `property_units`
+14. `property_amenities`
+15. `property_amenity_links`
+
+### Rental applications
+
+16. `rental_applications`
+17. `application_documents`
+18. `application_verifications`
+19. `application_payments`
+
+### Communication
+
+20. `conversations`
+21. `messages`
+22. `faqs`
+
+### Platform
+
+23. `platform_settings`
+24. `notifications`
+25. `audit_logs`
+
+Actually, that's **25**, not 23. And I'm deliberately keeping them separate because these are distinct responsibilities. Better to have 25 clean tables than 15 monster tables with JSON fields everywhere.
+
+---
+
+# 2. Identity architecture
+
+## `profiles`
+
+```text
+id              UUID PK
+email           TEXT UNIQUE
+phone           TEXT
+full_name       TEXT
+role            user_role
+status          user_status
+avatar_url      TEXT NULL
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+### `user_role`
+
+```text
+admin
+provider
+applicant
+```
+
+### `user_status`
+
+```text
+active
+suspended
+deactivated
+```
+
+Relationship:
+
+```text
+auth.users
+    │
+    └── profiles
+          ├── provider_profiles
+          └── applicant_profiles
+```
+
+---
+
+# 3. Provider
+
+## `provider_profiles`
+
+```text
+id                  UUID PK
+user_id             UUID FK → profiles.id UNIQUE
+provider_type       provider_type
+business_name       TEXT NULL
+business_phone      TEXT
+business_address    TEXT NULL
+
+verification_status verification_status
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `provider_type`
+
+```text
+owner
+agent
+property_manager
+company
+```
+
+---
+
+# 4. Applicant
+
+## `applicant_profiles`
+
+```text
+id                  UUID PK
+user_id             UUID FK → profiles.id UNIQUE
+
+date_of_birth       DATE NULL
+nationality         TEXT NULL
+state_of_residence  UUID FK → states.id NULL
+address             TEXT NULL
+occupation          TEXT NULL
+employer            TEXT NULL
+monthly_income      NUMERIC NULL
+
+verification_status verification_status
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+---
+
+# 5. Location hierarchy
+
+We're making Nigeria-wide support a first-class feature.
+
+```text
+states
+   │
+   └── lgas
+         │
+         └── areas
+               │
+               └── properties
+```
+
+## `states`
+
+```text
+id          UUID PK
+name        TEXT UNIQUE
+code        TEXT UNIQUE
+```
+
+## `lgas`
+
+```text
+id          UUID PK
+state_id    UUID FK → states.id
+name        TEXT
+
+UNIQUE(state_id, name)
+```
+
+## `areas`
+
+```text
+id          UUID PK
+lga_id      UUID FK → lgas.id
+name        TEXT
+
+UNIQUE(lga_id, name)
+```
+
+This gives us:
+
+> Oyo → Ibadan North → Bodija → Property
+
+instead of random text values scattered throughout the database.
+
+---
+
+# 6. ⭐ Listing access plans
+
+This is the new part we just discovered.
+
+## `listing_plans`
+
+The admin defines what providers pay for.
+
+```text
+id              UUID PK
+name            TEXT
+description     TEXT NULL
+
+price           NUMERIC
+duration_days   INTEGER
+
+is_active       BOOLEAN
+
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+Example:
+
+```text
+90-Day Listing Access
+₦100,000
+90 days
+```
+
+But those values are **admin-controlled**.
+
+This is not technically a subscription.
+
+It is:
+
+> **Time-limited listing access.**
+
+---
+
+# 7. Provider payments
+
+## `provider_payments`
+
+```text
+id                  UUID PK
+
+provider_id         UUID FK → provider_profiles.id
+listing_plan_id     UUID FK → listing_plans.id
+payment_method_id   UUID FK → payment_methods.id
+
+amount              NUMERIC
+proof_path          TEXT
+
+status              payment_status
+
+submitted_at        TIMESTAMPTZ
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Important:
+
+`amount` should be stored as the **actual amount paid**, even if the plan price later changes.
+
+That preserves historical accuracy.
+
+---
+
+# 8. Provider listing periods
+
+## `provider_listing_periods`
+
+This is the provider's actual entitlement.
+
+```text
+id                  UUID PK
+
+provider_id         UUID FK → provider_profiles.id
+listing_plan_id     UUID FK → listing_plans.id
+payment_id          UUID FK → provider_payments.id UNIQUE
+
+starts_at           TIMESTAMPTZ
+expires_at          TIMESTAMPTZ
+
+status              listing_period_status
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `listing_period_status`
+
+```text
+pending
+active
+expired
+cancelled
+```
+
+### Relationship
+
+```text
+Provider
+   │
+   ├── Payment
+   │     └── Listing Plan
+   │
+   └── Listing Period
+          │
+          └── Properties
+```
+
+---
+
+# 9. Provider listing lifecycle
+
+This is now officially:
+
+```text
+Register
+   ↓
+Choose listing plan
+   ↓
+Pay
+   ↓
+Upload proof
+   ↓
+Admin verifies
+   ↓
+Listing period activated
+   ↓
+Provider can submit unlimited properties
+   ↓
+Property verification
+   ↓
+Property becomes public
+   ↓
+Listing period expires
+   ↓
+Provider's properties become hidden
+   ↓
+Provider renews
+   ↓
+Properties become public again
+```
+
+### Critical rule
+
+A provider does **not** pay per property.
+
+They pay for **listing access for a defined period**.
+
+---
+
+# 10. Renewal behavior
+
+We should explicitly encode this rule:
+
+### Early renewal
+
+If current access expires on:
+
+> November 30
+
+and provider renews on:
+
+> November 10
+
+the new period begins:
+
+> December 1
+
+—not November 10.
+
+That prevents providers from losing unused days.
+
+Conceptually:
+
+```text
+current_period.expires_at
+        ↓
+new_period.starts_at
+```
+
+If there is no active period:
+
+```text
+new_period.starts_at = payment verification time
+```
+
+---
+
+# 11. Payment methods
+
+## `payment_methods`
+
+```text
+id              UUID PK
+name            TEXT
+type            payment_method_type
+instructions    TEXT
+
+account_name    TEXT NULL
+account_number  TEXT NULL
+bank_name       TEXT NULL
+paypal_email    TEXT NULL
+
+is_active       BOOLEAN
+
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+Possible:
+
+```text
+bank_transfer
+paypal
+cash
+other
+```
+
+The client can configure what appears.
+
+No payment gateway is required for v1.
+
+---
+
+# 12. Properties
+
+## `properties`
+
+```text
+id                  UUID PK
+
+provider_id         UUID FK → provider_profiles.id
+
+title               TEXT
+slug                TEXT UNIQUE
+description         TEXT
+
+property_type       property_type
+
+state_id            UUID FK → states.id
+lga_id              UUID FK → lgas.id
+area_id             UUID FK → areas.id
+
+address             TEXT
+
+latitude            NUMERIC NULL
+longitude           NUMERIC NULL
+
+status              property_status
+
+verification_notes  TEXT NULL
+
+verified_by         UUID FK → profiles.id NULL
+verified_at         TIMESTAMPTZ NULL
+
+published_at        TIMESTAMPTZ NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### `property_status`
+
+```text
+draft
+pending_verification
+approved
+rejected
+suspended
+archived
+```
+
+---
+
+# 13. Property visibility
+
+This is now more sophisticated.
+
+A property is publicly visible only if:
+
+```text
+property.status = approved
+AND
+provider has active listing period
+AND
+listing_period.expires_at > NOW()
+```
+
+So we don't change:
+
+```text
+approved
+```
+
+to:
+
+```text
+expired
+```
+
+when the provider's package expires.
+
+The property remains **approved**, but it isn't currently eligible for public display.
+
+That distinction is important.
+
+### Example
+
+```text
+Property status:
+APPROVED ✅
+
+Provider listing access:
+EXPIRED ❌
+
+Public:
+HIDDEN
+```
+
+After renewal:
+
+```text
+Property:
+APPROVED ✅
+
+Provider listing access:
+ACTIVE ✅
+
+Public:
+VISIBLE
+```
+
+---
+
+# 14. Property images
+
+## `property_images`
+
+```text
+id              UUID PK
+property_id     UUID FK → properties.id
+
+storage_path    TEXT
+is_primary      BOOLEAN
+sort_order      INTEGER
+
+created_at      TIMESTAMPTZ
+```
+
+Public property images can use a public/readable storage path.
+
+---
+
+# 15. Property units
+
+## `property_units`
+
+```text
+id                  UUID PK
+property_id         UUID FK → properties.id
+
+name                TEXT
+unit_type           unit_type
+
+bedrooms            INTEGER
+bathrooms           INTEGER NULL
+
+rent_amount         NUMERIC
+rent_period         rent_period
+
+available_quantity  INTEGER
+
+status              unit_status
+
+description         TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+This allows:
+
+```text
+Property
+│
+├── Self-contained — ₦700k — 3 available
+├── 1 Bedroom      — ₦1m   — 4 available
+└── 2 Bedroom      — ₦1.5m — 2 available
+```
+
+---
+
+# 16. Amenities
+
+## `property_amenities`
+
+```text
+id          UUID PK
+name        TEXT UNIQUE
+```
+
+## `property_amenity_links`
+
+```text
+property_id     UUID FK → properties.id
+amenity_id      UUID FK → property_amenities.id
+
+PRIMARY KEY(property_id, amenity_id)
+```
+
+Examples:
+
+* Parking
+* Security
+* Water
+* Electricity
+* Generator
+* Kitchen
+* Fenced compound
+
+---
+
+# 17. Rental applications
+
+## `rental_applications`
+
+```text
+id                  UUID PK
+
+applicant_id        UUID FK → applicant_profiles.id
+property_id         UUID FK → properties.id
+unit_id             UUID FK → property_units.id
+
+status              application_status
+
+message             TEXT NULL
+admin_notes         TEXT NULL
+
+application_data    JSONB NULL
+
+submitted_at        TIMESTAMPTZ NULL
+
+reviewed_at         TIMESTAMPTZ NULL
+reviewed_by         UUID FK → profiles.id NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### Why `application_data JSONB`?
+
+Because Blue Sky may later say:
+
+> "We want next of kin."
+
+or:
+
+> "We want previous landlord information."
+
+We shouldn't have to modify the database for every new application question.
+
+The core applicant information stays structured, while flexible application answers can live in JSONB.
+
+---
+
+# 18. Application documents
+
+## `application_documents`
+
+```text
+id                  UUID PK
+application_id      UUID FK → rental_applications.id
+
+document_type       document_type
+storage_path        TEXT
+
+status              document_status
+
+reviewed_by         UUID FK → profiles.id NULL
+reviewed_at         TIMESTAMPTZ NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+```
+
+### `document_type`
+
+```text
+national_id
+voters_card
+passport
+drivers_license
+proof_of_address
+income_proof
+employment_proof
+other
+```
+
+Private storage bucket.
+
+---
+
+# 19. Application verification
+
+## `application_verifications`
+
+```text
+id                  UUID PK
+application_id      UUID FK → rental_applications.id
+
+verification_type   verification_type
+status              verification_status
+
+notes               TEXT NULL
+
+verified_by         UUID FK → profiles.id NULL
+verified_at         TIMESTAMPTZ NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+### Verification types
+
+```text
+identity
+residency
+income
+employment
+financial_capability
+other
+```
+
+This is where Blue Sky can determine whether the applicant meets its requirements.
+
+---
+
+# 20. Application payments
+
+## `application_payments`
+
+```text
+id                  UUID PK
+
+application_id      UUID FK → rental_applications.id
+payment_method_id   UUID FK → payment_methods.id
+
+amount              NUMERIC
+proof_path          TEXT
+
+status              payment_status
+
+submitted_at        TIMESTAMPTZ
+verified_at         TIMESTAMPTZ NULL
+verified_by         UUID FK → profiles.id NULL
+
+rejection_reason    TEXT NULL
+
+created_at          TIMESTAMPTZ
+updated_at          TIMESTAMPTZ
+```
+
+Again:
+
+**external payment → proof upload → admin verification.**
+
+---
+
+# 21. Messaging
+
+## `conversations`
+
+```text
+id              UUID PK
+
+property_id     UUID FK → properties.id NULL
+applicant_id    UUID FK → profiles.id NULL
+
+status          conversation_status
+
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+## `messages`
+
+```text
+id              UUID PK
+
+conversation_id UUID FK → conversations.id
+sender_id       UUID FK → profiles.id NULL
+
+message         TEXT
+is_automated    BOOLEAN
+
+created_at      TIMESTAMPTZ
+read_at         TIMESTAMPTZ NULL
+```
+
+---
+
+# 22. FAQ / automatic responses
+
+## `faqs`
+
+```text
+id              UUID PK
+question        TEXT
+answer          TEXT
+keywords        TEXT[]
+is_active       BOOLEAN
+priority        INTEGER
+
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+Simple deterministic system:
+
+```text
+Customer message
+       ↓
+Normalize text
+       ↓
+Check keywords
+       ↓
+Match?
+ ┌─────┴──────┐
+YES           NO
+ ↓             ↓
+FAQ reply     Admin inbox
+```
+
+No AI.
+
+---
+
+# 23. Platform configuration
+
+## `platform_settings`
+
+```text
+id              UUID PK
+key             TEXT UNIQUE
+value           JSONB
+
+updated_by      UUID FK → profiles.id
+updated_at      TIMESTAMPTZ
+```
+
+Can store:
+
+```text
+company_name
+support_email
+support_phone
+whatsapp_number
+facebook_url
+address
+application_fee
+required_documents
+```
+
+For actual listing prices and payment methods, we use their dedicated tables instead of stuffing everything into settings.
+
+---
+
+# 24. Notifications
+
+## `notifications`
+
+```text
+id              UUID PK
+user_id         UUID FK → profiles.id
+
+type            notification_type
+title           TEXT
+message         TEXT
+
+data            JSONB NULL
+
+is_read         BOOLEAN
+
+created_at      TIMESTAMPTZ
+```
+
+This supports things like:
+
+```text
+Your property has been approved.
+Your payment has been verified.
+Your application has been received.
+Your listing access expires in 7 days.
+Your listing access has expired.
+```
+
+---
+
+# 25. Audit logs
+
+## `audit_logs`
+
+```text
+id              UUID PK
+
+actor_id        UUID FK → profiles.id
+
+action          TEXT
+entity_type     TEXT
+entity_id       UUID
+
+old_data        JSONB NULL
+new_data        JSONB NULL
+
+ip_address      INET NULL
+
+created_at      TIMESTAMPTZ
+```
+
+This gives us an administrative trail.
+
+---
+
+# 🔗 Final relationship architecture
+
+Here's the complete picture now:
+
+```text
+                              profiles
+                                  │
+                 ┌────────────────┼────────────────┐
+                 │                │                │
+              ADMIN            PROVIDER         APPLICANT
+                                  │                │
+                                  │                │
+                        provider_profiles    applicant_profiles
+                                  │                │
+                    ┌─────────────┼───────┐        │
+                    │             │       │        │
+                    ▼             ▼       ▼        │
+              payments       periods   properties  │
+                    │             │       │         │
+                    ▼             │   ┌───┼─────────┤
+              listing_plans      │   │   │         │
+                                  │   ▼   ▼         ▼
+                                  │ images units  applications
+                                  │               │
+                                  │        ┌──────┼─────────┐
+                                  │        │      │         │
+                                  │        ▼      ▼         ▼
+                                  │    documents payments verifications
+                                  │
+                                  │
+locations:
+states
+  ↓
+lgas
+  ↓
+areas
+  ↓
+properties
+```
+
+Communication runs alongside it:
+
+```text
+profiles
+   │
+   └── conversations
+          │
+          └── messages
+
+faqs
+   ↓
+automated responses
+```
+
+And everything important feeds:
+
+```text
+                 audit_logs
+                     ▲
+                     │
+     ┌───────────────┼────────────────┐
+     │               │                │
+  payments       properties      applications
+     │               │                │
+ verification    verification     verification
+```
+
+---
+
+# 🔥 The three critical state machines
+
+This is something I want us to preserve when we eventually write the backend.
+
+### Provider listing access
+
+```text
+PENDING
+   ↓
+ACTIVE
+   ↓
+EXPIRED
+   ↓
+ACTIVE (renewed)
+```
+
+or:
+
+```text
+PENDING → CANCELLED
+```
+
+### Property
+
+```text
+DRAFT
+  ↓
+PENDING_VERIFICATION
+  ├──→ REJECTED
+  │       ↓
+  │     DRAFT
+  │
+  └──→ APPROVED
+          ↓
+      SUSPENDED
+          ↓
+       APPROVED
+```
+
+### Rental application
+
+```text
+DRAFT
+ ↓
+SUBMITTED
+ ↓
+UNDER_REVIEW
+ ├──→ REJECTED
+ └──→ APPROVED
+```
+
+Those three workflows are basically the **heart of Blue Sky**.
+
+---
+
+# 🔐 Security architecture
+
+Because we're planning to use Supabase, I'd make this strict from day one:
+
+### Public
+
+Can access:
+
+* Approved + currently active properties
+* Public property images
+* Available units
+* Locations
+* Amenities
+* Active FAQs
+* Public company information
+
+### Provider
+
+Can access/manage:
+
+* Own profile
+* Own listing periods
+* Own payments
+* Own properties
+* Own property images
+* Own units
+
+### Applicant
+
+Can access:
+
+* Own profile
+* Own applications
+* Own documents
+* Own payment proofs
+* Own conversations
+* Public properties
+
+### Admin
+
+Can manage everything.
+
+And:
+
+> **Applicant documents and payment proofs must live in private storage.**
+
+No public bucket. No guessable URLs. No "let's just hide the button" security. 😭
+
+For Supabase specifically, exposed tables should use RLS, authorization should not depend on user-editable metadata, and sensitive storage needs explicit access policies.
+
+---
+
+# ⚡ The provider expiration engine
+
+One more architectural point.
+
+We **don't need to constantly update every property** when a provider's period expires.
+
+Instead, public-property queries check:
+
+```text
+property approved
++
+provider has active listing period
++
+expires_at > current time
+```
+
+That means expiration happens naturally.
+
+For notifications, however, we'll eventually need a scheduled process that checks:
+
+```text
+30 days remaining
+14 days
+7 days
+3 days
+1 day
+expired
+```
+
+That can be handled later with a scheduled backend job.
+
+---
+
+# 🧠 Final verdict
+
+**Yes. This revised architecture is now strong enough to start implementation.**
+
+We have moved from:
+
+> "Let's make a real-estate website."
+
+to an actual system with:
+
+**Identity → Providers → Listing Plans → Payments → Listing Periods → Properties → Units → Verification → Applicants → Applications → Documents → Payments → Messaging → Notifications → Admin → Audit**
+
+And the new listing-period requirement fits cleanly into it.
+
+### What I would do next
+
+Before generating the UI designs, I'd create **one final technical artifact**:
+
+> **`BLUE_SKY_DATABASE_SCHEMA_V1.sql`**
+
+It should contain the actual PostgreSQL implementation:
+
+* Extensions
+* ENUMs
+* Tables
+* Primary keys
+* Foreign keys
+* `CHECK` constraints
+* `UNIQUE` constraints
+* Indexes
+* Triggers
+* `updated_at` handling
+* RLS
+* RLS policies
+* Storage strategy
+* Public-property query/view
+* Provider listing-period logic
+* Seed data for Nigerian states
+* Initial admin/configuration structure
+
+Then we can inspect that schema **before executing anything**.
+
+After that, the architecture is genuinely locked, and we can move to the **system route map → wireframes → visual design generation → frontend implementation**.
+
+That is the order I'd use.
+
+Yeah, we no need to create the SQL database schema yet. So just leave that. I will work with the agent with that. The agent will create the SQL schema. So all we need to do now is to draft out the wireframe and the roadmap, visual design generation. So before we generate any design, we need to know about the, what, how many pages we will be having, what are those pages, what will they contain, and, you know, we need a description about each page, for the admin, for the property providers, and for the users who want to rent property. So yeah, we need to define all that. And also, for now, I think that is what we should do now. Then after we've done that, we will now think about generating design. And we should focus on mobile first because the site will be accessible on mobile phone mostly, most of the time. So I think mobile first approach will be a great idea.
+Exactly. **We stop at the architecture and move into product/UX architecture now.** No SQL yet. The agent can turn the locked model into PostgreSQL later.
+
+And yes: **mobile-first should be the primary design constraint**, not "desktop design squeezed into a phone." The applicant/provider experience especially needs to feel like a mobile app even though it's a web platform.
+
+# Blue Sky Property Management
+
+## UX / Wireframe Architecture v1.0
+
+We should design around **three separate experiences**:
+
+```text
+                    BLUE SKY
+                       │
+       ┌───────────────┼────────────────┐
+       │               │                │
+       ▼               ▼                ▼
+    PUBLIC          PROVIDER          ADMIN
+    / APPLICANT     DASHBOARD         DASHBOARD
+```
+
+There is also an important distinction:
+
+**A visitor does not need an account just to browse properties.**
+
+They only enter the applicant flow when they want to apply, save/contact, etc.
+
+---
+
+# 1. Overall page architecture
+
+I'd target approximately **30 screens/pages**, but several are dashboard states rather than completely independent pages.
+
+### Public / Rental Experience — 10
+
+1. Home
+2. Property Listings
+3. Property Search Results / Filter
+4. Property Details
+5. Apply for Property
+6. Applicant Registration / Login
+7. Applicant Dashboard
+8. My Applications
+9. Application Details
+10. Messages
+
+### Provider Experience — 9
+
+11. Provider Registration
+12. Provider Login
+13. Listing Access / Plans
+14. Payment & Proof Submission
+15. Provider Dashboard
+16. My Properties
+17. Add Property
+18. Edit Property
+19. Property Verification Status
+
+### Admin Experience — 11
+
+20. Admin Login
+21. Admin Dashboard
+22. Properties
+23. Property Review
+24. Providers
+25. Provider Details
+26. Listing Plans
+27. Payments
+28. Rental Applications
+29. Application Review
+30. Messages / Support
+31. FAQs
+32. Platform Settings
+33. Audit Logs
+
+So technically **33 routes/screens**, although some can share the same shell and components.
+
+That's a much healthier number than trying to cram everything into five pages.
+
+---
+
+# 2. PUBLIC EXPERIENCE
+
+## Page 01 — Home
+
+This is the first impression.
+
+### Mobile structure
+
+```text
+┌─────────────────────────┐
+│ ☰     BLUE SKY     🔍   │
+├─────────────────────────┤
+│                         │
+│ Find Your Next          │
+│ Home With Confidence   │
+│                         │
+│ [ Search properties ]   │
+│                         │
+├─────────────────────────┤
+│ Browse by location      │
+│                         │
+│ Lagos   Oyo   Abuja     │
+│ Enugu   ...             │
+├─────────────────────────┤
+│ Featured Properties     │
+│                         │
+│ ┌─────────────────────┐ │
+│ │       IMAGE         │ │
+│ │                     │ │
+│ │  2 Bedroom Flat     │ │
+│ │  Ibadan, Oyo        │ │
+│ │  ₦1.2m / year       │ │
+│ └─────────────────────┘ │
+│                         │
+│ [View all properties]   │
+├─────────────────────────┤
+│ Why Blue Sky?           │
+│ ✓ Verified listings     │
+│ ✓ Secure applications   │
+│ ✓ Transparent process   │
+├─────────────────────────┤
+│ Need help?              │
+│ [ Chat with us ]        │
+└─────────────────────────┘
+```
+
+### Purpose
+
+Immediately answer:
+
+> "Can I trust this platform to find a legitimate rental property?"
+
+---
+
+# 3. Property Listings
+
+## Page 02 — Browse Properties
+
+This is the marketplace.
+
+Filters:
+
+* State
+* LGA
+* Area
+* Property type
+* Number of bedrooms
+* Rent range
+* Rent period
+* Amenities
+* Availability
+
+Mobile:
+
+```text
+┌─────────────────────────┐
+│ ← Properties       ⚙️  │
+├─────────────────────────┤
+│ [ Search location... ]  │
+│                         │
+│ [ Filters ] [ Sort ]    │
+├─────────────────────────┤
+│ 124 properties          │
+│                         │
+│ ┌─────────────────────┐ │
+│ │      IMAGE          │ │
+│ │                     │ │
+│ │ 2 Bedroom Apartment │ │
+│ │ Bodija, Ibadan      │ │
+│ │ ₦1.5m/year          │ │
+│ │ ✓ Verified          │ │
+│ └─────────────────────┘ │
+│                         │
+│ ┌─────────────────────┐ │
+│ │      IMAGE          │ │
+│ │ ...                 │ │
+│ └─────────────────────┘ │
+└─────────────────────────┘
+```
+
+---
+
+# 4. Property Details
+
+## Page 03
+
+This is one of the most important screens.
+
+### Structure
+
+```text
+[ Image Gallery ]
+
+Verified ✓
+
+2 Bedroom Apartment
+Bodija, Ibadan
+
+₦1,500,000 / year
+
+─────────────────
+
+Property description
+
+─────────────────
+
+Available units
+
+○ 2 Bedroom
+  ₦1.5m/year
+
+○ Self Contained
+  ₦700k/year
+
+─────────────────
+
+Amenities
+
+✓ Parking
+✓ Security
+✓ Water
+✓ Electricity
+
+─────────────────
+
+Location
+
+Bodija
+Ibadan North
+Oyo State
+
+─────────────────
+
+Listed by
+Blue Sky verified provider
+
+─────────────────
+
+[ Message ]
+[ Apply Now ]
+```
+
+### Important
+
+The **Apply Now** button should be persistent near the bottom on mobile.
+
+---
+
+# 5. Property Application
+
+## Page 04
+
+This is essentially a multi-step mobile form.
+
+Don't make applicants fill one giant scary form.
+
+### Step 1
+
+**Personal Information**
+
+* Full name
+* Phone
+* Email
+* Date of birth
+* Nationality
+
+### Step 2
+
+**Residence**
+
+* State
+* LGA
+* Address
+* Residency information
+
+### Step 3
+
+**Employment / Financial Information**
+
+* Occupation
+* Employer
+* Monthly income
+* Other relevant information
+
+### Step 4
+
+**Identity Verification**
+
+Upload:
+
+* Voter's card
+* National ID
+* Passport
+* Driver's license
+
+depending on what Blue Sky requires.
+
+### Step 5
+
+**Supporting Documents**
+
+* Proof of address
+* Income proof
+* Employment proof
+
+### Step 6
+
+**Review & Submit**
+
+```text
+Application Summary
+
+Property:
+2 Bedroom Apartment
+
+Location:
+Bodija, Ibadan
+
+Rent:
+₦1.5m/year
+
+[ Submit Application ]
+```
+
+---
+
+# 6. Applicant Dashboard
+
+## Page 05
+
+Once the user creates an account:
+
+```text
+Good morning, John 👋
+
+────────────────────
+
+Your Applications
+
+┌───────────────────┐
+│ 2 Bedroom Flat    │
+│ Bodija, Ibadan    │
+│                   │
+│ 🟡 Under Review   │
+└───────────────────┘
+
+────────────────────
+
+Messages
+
+You have 2 unread messages
+
+────────────────────
+
+Profile
+Verification
+Documents
+```
+
+Bottom navigation:
+
+```text
+Home | Applications | Messages | Profile
+```
+
+Mobile-first means **bottom navigation is appropriate here**.
+
+---
+
+# 7. Applicant Application Details
+
+## Page 06
+
+Shows:
+
+```text
+Application #BS-10293
+
+2 Bedroom Apartment
+Bodija, Ibadan
+
+Status:
+🟡 Under Review
+
+────────────────
+
+Application progress
+
+✓ Submitted
+✓ Documents received
+● Verification
+○ Decision
+
+────────────────
+
+Documents
+
+✓ Identity
+✓ Proof of address
+✓ Income proof
+
+────────────────
+
+Payment
+
+✓ Payment proof submitted
+
+────────────────
+
+[ Message Blue Sky ]
+```
+
+This makes the process transparent.
+
+---
+
+# 8. Provider experience
+
+Now we switch to the property owner/agent.
+
+The provider interface should feel more like a **small business dashboard**.
+
+---
+
+# 9. Provider Registration
+
+## Page 07
+
+```text
+Create Provider Account
+
+I am a:
+
+○ Property Owner
+○ Agent
+○ Property Manager
+○ Company
+
+Full name
+Phone
+Email
+Password
+
+Business information
+
+[ Create Account ]
+```
+
+After registration:
+
+```text
+Your account is ready.
+
+To list properties, choose
+a listing access plan.
+```
+
+---
+
+# 10. Listing Plans
+
+## Page 08
+
+This is critical because it's Blue Sky's monetization point.
+
+```text
+Choose Listing Access
+
+Select the period that works
+for your property portfolio.
+
+┌─────────────────────────┐
+│ 30 DAYS                 │
+│                         │
+│ ₦XX,XXX                 │
+│                         │
+│ Unlimited properties    │
+│                         │
+│ [ Choose Plan ]         │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│ 90 DAYS                 │
+│                         │
+│ ₦XX,XXX                 │
+│                         │
+│ Unlimited properties    │
+│                         │
+│ [ Choose Plan ]         │
+└─────────────────────────┘
+```
+
+The actual packages come from the admin.
+
+---
+
+# 11. Payment & Proof
+
+## Page 09
+
+```text
+90-Day Listing Access
+
+Amount:
+₦100,000
+
+Payment Method:
+
+○ Bank Transfer
+○ PayPal
+○ Cash
+
+Payment instructions
+
+─────────────────
+
+Upload payment proof
+
+[ Choose File ]
+
+[ Submit Payment ]
+```
+
+Status:
+
+```text
+🟡 Payment verification pending
+```
+
+---
+
+# 12. Provider Dashboard
+
+## Page 10
+
+This should be one of the strongest dashboard screens.
+
+```text
+Good morning, Helen 👋
+
+LISTING ACCESS
+
+🟢 ACTIVE
+
+Expires:
+18 Nov 2026
+
+91 days remaining
+
+[ Renew Access ]
+
+────────────────────
+
+PROPERTY OVERVIEW
+
+12 Total
+8 Published
+3 Pending
+1 Rejected
+
+[ + Add Property ]
+
+────────────────────
+
+Recent Properties
+
+2 Bedroom Apartment
+✓ Published
+
+Self Contained
+🟡 Pending Review
+
+3 Bedroom Flat
+✓ Published
+```
+
+---
+
+# 13. My Properties
+
+## Page 11
+
+```text
+My Properties
+
+[ + Add Property ]
+
+[All] [Published] [Pending] [Rejected]
+
+────────────────
+
+2 Bedroom Apartment
+Bodija
+
+✓ Published
+
+[ Edit ]
+
+────────────────
+
+3 Bedroom Flat
+Jericho
+
+🟡 Pending verification
+
+────────────────
+
+Self Contained
+Challenge
+
+❌ Rejected
+
+[ View reason ]
+```
+
+---
+
+# 14. Add Property
+
+## Page 12
+
+Again, **wizard**, not giant form.
+
+### Step 1 — Basic information
+
+* Title
+* Description
+* Property type
+
+### Step 2 — Location
+
+* State
+* LGA
+* Area
+* Address
+
+### Step 3 — Units
+
+* Unit type
+* Bedrooms
+* Bathrooms
+* Rent
+* Rent period
+* Quantity
+
+### Step 4 — Amenities
+
+Select:
+
+```text
+☐ Parking
+☐ Security
+☐ Water
+☐ Electricity
+☐ Generator
+☐ Kitchen
+...
+```
+
+### Step 5 — Images
+
+Upload property images.
+
+Choose primary image.
+
+### Step 6 — Review
+
+```text
+Everything looks good?
+
+[ Submit for Verification ]
+```
+
+---
+
+# 15. Property verification status
+
+## Page 13
+
+The provider needs to understand what happened.
+
+```text
+Property Review
+
+2 Bedroom Apartment
+Bodija
+
+Status:
+🟡 Under Review
+
+Submitted:
+August 19, 2026
+
+────────────────
+
+Review timeline
+
+✓ Property submitted
+● Admin review
+○ Published
+```
+
+If rejected:
+
+```text
+🔴 Property Rejected
+
+Reason:
+
+"Property address could not be
+verified."
+
+[ Edit Property ]
+[ Resubmit ]
+```
+
+This is much better than simply showing:
+
+> "Rejected."
+
+---
+
+# 16. Admin experience
+
+Now we're entering the command center.
+
+Admin desktop will eventually need more space, but **we still design mobile-first**.
+
+---
+
+# 17. Admin Login
+
+## Page 14
+
+Simple.
+
+```text
+BLUE SKY
+
+Admin Portal
+
+Email
+Password
+
+[ Login ]
+
+Forgot password?
+```
+
+No public registration.
+
+---
+
+# 18. Admin Dashboard
+
+## Page 15
+
+The admin needs a high-level operational overview.
+
+```text
+Good morning, Admin.
+
+────────────────────
+
+PROPERTY OVERVIEW
+
+1,284 Total
+923 Published
+241 Pending
+120 Rejected
+
+────────────────────
+
+APPLICATIONS
+
+86 New
+32 Under Review
+14 Approved
+
+────────────────────
+
+PROVIDERS
+
+421 Total
+38 Pending Payments
+17 Expiring Soon
+
+────────────────────
+
+ACTION REQUIRED
+
+🔴 12 properties awaiting review
+🟡 8 payments awaiting verification
+🟡 23 applications awaiting review
+
+[ View Tasks ]
+```
+
+This dashboard should be **action-oriented**, not just pretty analytics.
+
+---
+
+# 19. Admin Properties
+
+## Page 16
+
+```text
+Properties
+
+[ Search ]
+
+[All] [Pending] [Approved] [Rejected]
+
+────────────────
+
+2 Bedroom Apartment
+Provider: John Doe
+Location: Bodija
+
+🟡 Pending
+
+[ Review ]
+```
+
+---
+
+# 20. Property Review
+
+## Page 17
+
+This is where the admin gets everything necessary to approve/reject.
+
+```text
+Property Review
+
+[ Image Gallery ]
+
+2 Bedroom Apartment
+
+Provider:
+John Doe
+
+Provider status:
+✓ Verified
+
+Location:
+Bodija, Ibadan
+
+Units:
+2 Bedroom — ₦1.5m/year
+
+Description:
+...
+
+────────────────
+
+Documents / evidence
+
+...
+
+────────────────
+
+[ Reject Property ]
+[ Approve Property ]
+```
+
+If rejected:
+
+```text
+Reason for rejection
+
+[________________]
+
+[ Reject ]
+```
+
+---
+
+# 21. Admin Providers
+
+## Page 18
+
+```text
+Providers
+
+421 Providers
+
+[ Search ]
+
+John Doe
+Agent
+🟢 Active listing access
+
+Expires:
+Nov 18
+
+────────────────
+
+Mary Properties
+Property Manager
+🔴 Expired
+
+────────────────
+
+[ View Provider ]
+```
+
+---
+
+# 22. Provider Details
+
+## Page 19
+
+Admin sees:
+
+```text
+John Doe
+
+Provider
+Agent
+
+Verification:
+✓ Verified
+
+Listing Access:
+🟢 Active
+
+Expires:
+Nov 18, 2026
+
+Properties:
+23
+
+Published:
+18
+
+Applications:
+31
+
+Payment History
+
+────────────────
+
+Properties
+
+────────────────
+
+Activity
+```
+
+---
+
+# 23. Listing Plans Management
+
+## Page 20
+
+```text
+Listing Plans
+
+30 Days
+₦XX,XXX
+🟢 Active
+
+90 Days
+₦XX,XXX
+🟢 Active
+
+180 Days
+₦XX,XXX
+🔴 Disabled
+
+[ + Create Plan ]
+```
+
+Create/edit:
+
+```text
+Plan Name
+Price
+Duration
+Description
+Active
+```
+
+---
+
+# 24. Admin Payments
+
+## Page 21
+
+Two major categories:
+
+```text
+Provider Payments
+Application Payments
+```
+
+Provider payment:
+
+```text
+John Doe
+
+90-Day Listing Access
+
+₦100,000
+
+🟡 Pending
+
+[ View Proof ]
+
+[ Reject ] [ Verify ]
+```
+
+---
+
+# 25. Rental Applications
+
+## Page 22
+
+```text
+Applications
+
+[All] [New] [Review] [Approved] [Rejected]
+
+John Doe
+2 Bedroom Apartment
+Bodija
+
+🟡 Under Review
+
+────────────────
+
+Mary Smith
+Self Contained
+Jericho
+
+🟢 Approved
+```
+
+---
+
+# 26. Application Review
+
+## Page 23
+
+This is one of the most sensitive pages.
+
+```text
+Applicant
+
+John Doe
+
+────────────────
+
+Personal Information
+
+...
+
+────────────────
+
+Identity Verification
+
+✓ Voter's Card
+
+[ View Document ]
+
+────────────────
+
+Residency
+
+✓ Verified
+
+────────────────
+
+Income
+
+🟡 Pending
+
+────────────────
+
+Payment
+
+✓ Verified
+
+────────────────
+
+Admin Notes
+
+[______________]
+
+────────────────
+
+[ Reject Application ]
+[ Approve Application ]
+```
+
+Private documents must never leak into the public side.
+
+---
+
+# 27. Admin Messages
+
+## Page 24
+
+```text
+Messages
+
+John Doe
+"Is this apartment still available?"
+
+🟢 New
+
+────────────────
+
+Mary Smith
+"How long does verification take?"
+
+🟢 New
+```
+
+Admin opens conversation:
+
+```text
+John Doe
+
+Customer:
+Is the apartment still available?
+
+Admin:
+Yes, it is currently available.
+
+[ Type message... ]
+```
+
+---
+
+# 28. FAQ Management
+
+## Page 25
+
+```text
+FAQs
+
+How do I apply?
+
+What documents do I need?
+
+How long does verification take?
+
+What payment methods are accepted?
+
+[ + Add FAQ ]
+```
+
+Each FAQ:
+
+```text
+Question
+Answer
+Keywords
+Priority
+Active
+```
+
+---
+
+# 29. Platform Settings
+
+## Page 26
+
+Admin can control:
+
+### Company
+
+* Name
+* Logo
+* Address
+* Email
+* Phone
+* WhatsApp
+* Facebook
+
+### Application
+
+* Required documents
+* Application requirements
+
+### Payments
+
+* Accepted payment methods
+* Payment instructions
+
+### Notifications
+
+* Expiry notification settings
+
+---
+
+# 30. Audit Logs
+
+## Page 27
+
+```text
+Activity Log
+
+Admin John
+
+Approved property
+2 Bedroom Apartment
+
+Today — 10:42 AM
+
+────────────────
+
+Admin Mary
+
+Verified payment
+₦100,000
+
+Today — 09:12 AM
+```
+
+Filters:
+
+* Admin
+* Action
+* Entity
+* Date
+
+---
+
+# 📱 Mobile-first navigation
+
+We shouldn't give every section a giant navbar.
+
+### Public
+
+```text
+Home
+Explore
+Messages
+Profile
+```
+
+### Applicant
+
+```text
+Home
+Applications
+Messages
+Profile
+```
+
+### Provider
+
+```text
+Dashboard
+Properties
+Add
+Messages
+Profile
+```
+
+### Admin
+
+Admin is different.
+
+Use a collapsible navigation:
+
+```text
+☰
+
+Dashboard
+Properties
+Providers
+Applications
+Payments
+Listing Plans
+Messages
+FAQs
+Settings
+Audit Logs
+```
+
+On mobile, this becomes a drawer.
+
+---
+
+# 🧭 Route architecture
+
+Now let's translate the screens into routes.
+
+### Public
+
+```text
+/
+ /properties
+ /properties/:slug
+ /search
+ /faq
+ /contact
+```
+
+### Authentication
+
+```text
+/login
+/register
+/forgot-password
+```
+
+### Applicant
+
+```text
+/applicant
+/applicant/applications
+/applicant/applications/:id
+/applicant/messages
+/applicant/profile
+/applicant/documents
+```
+
+### Provider
+
+```text
+/provider
+/provider/listing-access
+/provider/payments
+/provider/properties
+/provider/properties/new
+/provider/properties/:id
+/provider/properties/:id/edit
+/provider/messages
+/provider/profile
+```
+
+### Admin
+
+```text
+/admin
+/admin/properties
+/admin/properties/:id
+/admin/providers
+/admin/providers/:id
+/admin/listing-plans
+/admin/payments
+/admin/applications
+/admin/applications/:id
+/admin/messages
+/admin/faqs
+/admin/settings
+/admin/audit-logs
+```
+
+---
+
+# 🎨 Design system direction
+
+Before we generate the actual images, I'd define the visual direction.
+
+Blue Sky should **not** look like another generic Nigerian property website with a blue navbar, random stock photos, and 47 shadows fighting for their lives. 😂
+
+### Brand personality
+
+**Trustworthy + modern + calm + premium + accessible.**
+
+Think:
+
+> "Professional property management company"
+
+rather than:
+
+> "Random real-estate listing site."
+
+### Visual priorities
+
+**1. Property photography**
+
+The property itself should dominate.
+
+**2. Trust signals**
+
+Verified badges, transparent status, clear information.
+
+**3. Clean typography**
+
+Large readable headings, excellent spacing.
+
+**4. Cards**
+
+Property cards should be highly visual but compact enough for mobile.
+
+**5. Minimal color palette**
+
+Use the Blue Sky brand colors established from the logo, with neutral backgrounds.
+
+**6. Strong CTAs**
+
+Especially:
+
+* Apply
+* Message
+* Search
+* Add Property
+* Renew Listing Access
+
+---
+
+# 📐 Mobile-first design rules
+
+This should be our design law:
+
+### Don't design desktop and shrink it.
+
+Instead:
+
+```text
+Mobile
+  ↓
+Tablet
+  ↓
+Desktop
+```
+
+### Forms
+
+One-column by default.
+
+### Cards
+
+Vertical on mobile.
+
+### Tables
+
+Never force wide tables onto mobile.
+
+Use:
+
+```text
+Card
+→ tap
+→ details
+```
+
+### Admin
+
+Dense information can become:
+
+```text
+Metric cards
+↓
+Filter
+↓
+Record cards
+↓
+Details
+```
+
+### Bottom navigation
+
+Use it where it improves frequent mobile workflows.
+
+### Sticky actions
+
+For critical actions:
+
+```text
+[ Apply Now ]
+```
+
+should remain easy to reach.
+
+---
+
+# 🧩 Wireframe generation order
+
+I wouldn't generate 27 design images individually. That would be overkill.
+
+Instead, we should generate **design boards** representing the major flows.
+
+### Board 1 — Public marketplace
+
+Contains:
+
+* Home
+* Search
+* Property listing
+* Property details
+* Apply
+
+### Board 2 — Applicant
+
+Contains:
+
+* Dashboard
+* Applications
+* Application details
+* Documents
+* Messages
+
+### Board 3 — Provider
+
+Contains:
+
+* Dashboard
+* Listing plans
+* Payment
+* Properties
+* Add property
+* Verification
+
+### Board 4 — Admin
+
+Contains:
+
+* Dashboard
+* Properties
+* Property review
+* Providers
+* Applications
+* Application review
+
+### Board 5 — Supporting screens
+
+Contains:
+
+* Login
+* Registration
+* FAQ
+* Settings
+* Messages
+* Notifications
+* Empty/loading/error states
+
+That gives us **five visual design boards**, rather than trying to make 27 disconnected screenshots.
+
+---
+
+# 🚦Our build roadmap
+
+And this is the roadmap I'd use:
+
+```text
+PHASE 1
+UX Architecture
+        ↓
+Page inventory
+        ↓
+User flows
+        ↓
+Wireframes
+        ↓
+PHASE 2
+Visual Design
+        ↓
+Mobile design system
+        ↓
+Component library
+        ↓
+Responsive layouts
+        ↓
+PHASE 3
+Backend
+        ↓
+Database
+        ↓
+Auth
+        ↓
+RLS
+        ↓
+Storage
+        ↓
+Business logic
+        ↓
+PHASE 4
+Frontend
+        ↓
+Public marketplace
+        ↓
+Applicant portal
+        ↓
+Provider portal
+        ↓
+Admin portal
+        ↓
+PHASE 5
+Integration
+        ↓
+Payments/proof verification
+        ↓
+Property verification
+        ↓
+Applications
+        ↓
+Messaging
+        ↓
+Notifications
+        ↓
+PHASE 6
+Testing
+        ↓
+Security
+        ↓
+Mobile testing
+        ↓
+Workflow testing
+        ↓
+Client acceptance
+        ↓
+DEPLOY 🚀
+```
+
+## And one important rule
+
+**We should not generate the final visual design yet.**
+
+We're almost there, but before I trigger image generation, I would lock **three things**:
+
+1. **Exact user flows** — especially provider payment → listing access → property publishing and applicant → application → verification.
+2. **Wireframe structure** — what appears above/below the fold on each major screen.
+3. **Brand/design direction** — Blue Sky's colors, typography, photography style, card style, buttons, navigation, and overall visual language.
+
+Once those three are locked, **then we generate the five design boards**. That will give us a coherent product instead of a collection of beautiful screenshots that don't actually fit together.
+
+All right, so now let's look those three things, the exact user flows, the wireframe structure, and brand design direction for BlueSky, so we can move to generating the images of those pages. So, and also for the route, admin should be able to upload listings. I just thought you should know that. So yeah, that is all.
+Yep. And that last detail matters: **Admin is also a property publisher**, so the property workflow shouldn't be provider-only. Admin can create/upload listings directly, bypassing provider listing-access requirements.
+
+Let's lock the three things now: **user flows → wireframe rules → visual direction.**
+
+# Blue Sky UX Specification v1.0
+
+## 1. Exact User Flows
+
+We have four actors now:
+
+```text
+PUBLIC VISITOR
+      │
+      ├── Browse
+      ├── Search
+      ├── View property
+      ├── Message
+      └── Apply
+             │
+             ▼
+          APPLICANT
+
+PROPERTY PROVIDER
+      │
+      ├── Register
+      ├── Buy listing access
+      ├── Submit payment proof
+      ├── Add properties
+      └── Manage properties
+
+ADMIN
+      │
+      ├── Manage platform
+      ├── Manage providers
+      ├── Verify payments
+      ├── Verify properties
+      ├── Manage applications
+      ├── Upload properties directly
+      └── Manage settings
+```
+
+---
+
+# FLOW A — Visitor → Property
+
+This should be ridiculously simple.
+
+```text
+Home
+ ↓
+Search / Browse
+ ↓
+Filter
+ ↓
+Property Results
+ ↓
+Property Details
+ ├── Message
+ └── Apply
+```
+
+### Search
+
+User can search by:
+
+* State
+* LGA
+* Area
+* Property type
+* Bedrooms
+* Rent
+* Rent period
+* Amenities
+
+The important thing:
+
+**Don't make the user fill ten filters before seeing anything.**
+
+Start with:
+
+> Location + property type + rent
+
+Then expose advanced filters.
+
+---
+
+# FLOW B — Visitor → Message
+
+```text
+Property Details
+       ↓
+   Message
+       ↓
+Login/Register?
+   ├── No → Create account
+   └── Yes
+       ↓
+Conversation
+       ↓
+FAQ keyword engine
+       │
+       ├── Match → Automatic response
+       │
+       └── No match → Admin inbox
+```
+
+The user should know whether they're talking to:
+
+**Blue Sky Assistant**
+
+or:
+
+**Blue Sky Support**
+
+No fake "AI" pretending to be human.
+
+---
+
+# FLOW C — Visitor → Rental Application
+
+This is one of the most important flows.
+
+```text
+Property Details
+      ↓
+Select Unit
+      ↓
+Apply
+      ↓
+Login / Register
+      ↓
+Personal Information
+      ↓
+Residence
+      ↓
+Employment / Financial Information
+      ↓
+Identity Verification
+      ↓
+Documents
+      ↓
+Payment Proof (if required)
+      ↓
+Review Application
+      ↓
+Submit
+      ↓
+Application Submitted
+      ↓
+Admin Review
+```
+
+### Application status
+
+The applicant should always see:
+
+```text
+Submitted
+   ↓
+Under Review
+   ↓
+Verification
+   ↓
+Approved / Rejected
+```
+
+Never leave someone staring at:
+
+> "Application submitted."
+
+for three weeks wondering whether the database died. 😂
+
+---
+
+# FLOW D — Provider Registration
+
+```text
+Landing
+ ↓
+List Your Property
+ ↓
+Register
+ ↓
+Provider Profile
+ ↓
+Choose Listing Access
+ ↓
+Select Plan
+ ↓
+Payment Instructions
+ ↓
+Make external payment
+ ↓
+Upload payment proof
+ ↓
+Pending Verification
+ ↓
+Admin verifies
+ ├── Rejected
+ │     ↓
+ │   Fix / Resubmit
+ │
+ └── Approved
+       ↓
+   Listing Access Active
+       ↓
+   Provider Dashboard
+```
+
+---
+
+# FLOW E — Provider Listing Access
+
+Once active:
+
+```text
+Provider Dashboard
+       ↓
+Add Property
+       ↓
+Property Information
+       ↓
+Location
+       ↓
+Units
+       ↓
+Amenities
+       ↓
+Images
+       ↓
+Preview
+       ↓
+Submit
+       ↓
+Pending Admin Review
+```
+
+Admin:
+
+```text
+Review
+ ├── Reject → Provider receives reason
+ │                ↓
+ │             Edit/Resubmit
+ │
+ └── Approve
+       ↓
+   Property Published
+```
+
+---
+
+# FLOW F — Provider Expiration
+
+This needs to be visible everywhere.
+
+```text
+Listing Access
+     │
+     ▼
+ACTIVE
+     │
+     ├── 30 days left → reminder
+     ├── 14 days left → reminder
+     ├── 7 days left  → reminder
+     ├── 3 days left  → reminder
+     └── 1 day left   → reminder
+     │
+     ▼
+EXPIRED
+     │
+     ▼
+Provider properties hidden
+     │
+     ▼
+RENEW
+     │
+     ▼
+ACTIVE
+```
+
+But the properties themselves remain stored.
+
+That's important.
+
+---
+
+# FLOW G — Admin Uploads Property
+
+This is the new requirement.
+
+Admin should have:
+
+```text
+Admin Dashboard
+      ↓
+Properties
+      ↓
++ Add Property
+      ↓
+Property Information
+      ↓
+Location
+      ↓
+Units
+      ↓
+Amenities
+      ↓
+Images
+      ↓
+Publish
+```
+
+Admin-created properties can be:
+
+```text
+Draft
+Published
+Suspended
+Archived
+```
+
+They **do not need a provider listing-access period**.
+
+The database should therefore allow:
+
+```text
+property.provider_id = NULL
+```
+
+for properties owned/published directly by Blue Sky.
+
+We should represent that clearly in the UI:
+
+> **Listed by Blue Sky**
+
+rather than showing a fake provider.
+
+---
+
+# FLOW H — Admin Property Verification
+
+For provider properties:
+
+```text
+Pending Properties
+       ↓
+Review
+       ↓
+Approve / Reject
+```
+
+For admin-created properties:
+
+```text
+Admin creates
+       ↓
+Preview
+       ↓
+Publish
+```
+
+No pointless "admin approves admin" loop. 😅
+
+---
+
+# FLOW I — Admin Payment Verification
+
+```text
+Payments
+ ↓
+Pending
+ ↓
+Open payment
+ ↓
+View:
+ ├── Provider
+ ├── Plan
+ ├── Amount
+ ├── Payment method
+ └── Proof
+ ↓
+Verify / Reject
+```
+
+If verified:
+
+```text
+Payment
+   ↓
+Listing Period
+   ↓
+ACTIVE
+```
+
+---
+
+# FLOW J — Admin Application Review
+
+```text
+Applications
+      ↓
+Open application
+      ↓
+Applicant profile
+      ↓
+Property
+      ↓
+Documents
+      ↓
+Verification
+      ↓
+Payment proof
+      ↓
+Admin notes
+      ↓
+Approve / Reject
+```
+
+---
+
+# 2. Wireframe Structure
+
+Now let's establish **how screens are physically organized**.
+
+## Public mobile shell
+
+```text
+┌─────────────────────────┐
+│ ☰     BLUE SKY      🔍 │
+├─────────────────────────┤
+│                         │
+│       PAGE CONTENT      │
+│                         │
+│                         │
+│                         │
+├─────────────────────────┤
+│ Home Explore Msg Profile│
+└─────────────────────────┘
+```
+
+We don't necessarily need bottom navigation on every public page. It becomes more useful once authenticated.
+
+---
+
+# Home wireframe
+
+```text
+┌─────────────────────────┐
+│ ☰ Blue Sky         🔍  │
+├─────────────────────────┤
+│                         │
+│ Find a place             │
+│ you'll love to call      │
+│ home.                    │
+│                         │
+│ ┌─────────────────────┐ │
+│ │ 🔍 Where?            │ │
+│ └─────────────────────┘ │
+│                         │
+│ [ Rent ] [ Property ▼ ] │
+│                         │
+│ [ Search Properties ]   │
+│                         │
+├─────────────────────────┤
+│ Popular Locations       │
+│                         │
+│ [ Lagos ] [ Abuja ]     │
+│ [ Oyo ]   [ Rivers ]    │
+│                         │
+├─────────────────────────┤
+│ Featured Properties     │
+│                         │
+│ [ PROPERTY CARD ]       │
+│ [ PROPERTY CARD ]       │
+│                         │
+├─────────────────────────┤
+│ Why Blue Sky?           │
+│                         │
+│ ✓ Verified              │
+│ ✓ Transparent           │
+│ ✓ Secure                │
+│                         │
+└─────────────────────────┘
+```
+
+---
+
+# Property card
+
+This component is extremely important because it appears everywhere.
+
+```text
+┌─────────────────────────┐
+│                         │
+│        PROPERTY         │
+│         IMAGE           │
+│                         │
+│ ♡                       │
+├─────────────────────────┤
+│ ✓ Verified              │
+│ 2 Bedroom Apartment     │
+│ Bodija, Ibadan          │
+│                         │
+│ ₦1,500,000 / year       │
+│                         │
+│ 2 beds • 2 baths        │
+└─────────────────────────┘
+```
+
+The image should dominate.
+
+---
+
+# Property details
+
+Mobile:
+
+```text
+┌─────────────────────────┐
+│ ←                       │
+│                         │
+│      IMAGE GALLERY      │
+│                         │
+├─────────────────────────┤
+│ ✓ Verified              │
+│                         │
+│ 2 Bedroom Apartment     │
+│ Bodija, Ibadan          │
+│                         │
+│ ₦1.5m / year             │
+├─────────────────────────┤
+│ Available Units         │
+│                         │
+│ [2 Bedroom]             │
+│ ₦1.5m/year              │
+│                         │
+├─────────────────────────┤
+│ Description             │
+│                         │
+├─────────────────────────┤
+│ Amenities               │
+│                         │
+├─────────────────────────┤
+│ Location                │
+│                         │
+├─────────────────────────┤
+│ Listed by               │
+│ Blue Sky / Provider     │
+│                         │
+├─────────────────────────┤
+│ [ Message ] [ Apply ]   │
+└─────────────────────────┘
+```
+
+---
+
+# Provider dashboard wireframe
+
+```text
+┌─────────────────────────┐
+│ ☰   Provider Dashboard  │
+├─────────────────────────┤
+│ Welcome back 👋         │
+│                         │
+│ ┌─────────────────────┐ │
+│ │ LISTING ACCESS      │ │
+│ │ 🟢 ACTIVE            │ │
+│ │                     │ │
+│ │ 91 days remaining   │ │
+│ │ Expires Nov 18      │ │
+│ │                     │ │
+│ │ [ Renew ]           │ │
+│ └─────────────────────┘ │
+│                         │
+│ ┌──────┐ ┌──────┐      │
+│ │ 12   │ │ 8    │      │
+│ │Total │ │Live  │      │
+│ └──────┘ └──────┘      │
+│                         │
+│ [ + Add Property ]      │
+│                         │
+│ Recent Properties       │
+│                         │
+│ [ Property Card ]       │
+│ [ Property Card ]       │
+│                         │
+├─────────────────────────┤
+│ Home Properties Msg More│
+└─────────────────────────┘
+```
+
+---
+
+# Admin dashboard wireframe
+
+Admin needs more information density.
+
+```text
+┌─────────────────────────┐
+│ ☰  Blue Sky Admin       │
+├─────────────────────────┤
+│ Overview                │
+│                         │
+│ ┌────────┐ ┌────────┐  │
+│ │ 1,284  │ │ 923    │  │
+│ │Property│ │Published│ │
+│ └────────┘ └────────┘  │
+│                         │
+│ ┌────────┐ ┌────────┐  │
+│ │ 12     │ │ 86     │  │
+│ │Pending │ │Apps    │  │
+│ └────────┘ └────────┘  │
+│                         │
+│ Needs Attention         │
+│                         │
+│ 🔴 12 Properties        │
+│ 🟡 8 Payments           │
+│ 🟡 23 Applications      │
+│                         │
+│ Recent Activity         │
+│                         │
+│ [ Activity item ]       │
+│ [ Activity item ]       │
+└─────────────────────────┘
+```
+
+---
+
+# 3. Blue Sky Brand / Visual Direction
+
+Now the fun part.
+
+## Brand personality
+
+Blue Sky should communicate:
+
+**Trust**
+
+**Clarity**
+
+**Safety**
+
+**Professionalism**
+
+**Modern property management**
+
+**Accessibility**
+
+Not overly corporate.
+
+Not flashy.
+
+Not "crypto startup real estate." 😂
+
+---
+
+# Color direction
+
+The existing Blue Sky identity should drive the palette.
+
+I'd use:
+
+### Primary
+
+**Blue**
+
+For:
+
+* CTAs
+* links
+* active states
+* verification indicators
+* navigation accents
+
+### Sky / light blue
+
+For:
+
+* subtle backgrounds
+* information cards
+* highlights
+
+### Deep navy
+
+For:
+
+* headings
+* navigation
+* important text
+
+### Neutral
+
+White / very light gray backgrounds.
+
+### Status colors
+
+Green:
+
+**Verified / Approved / Active**
+
+Amber:
+
+**Pending / Warning**
+
+Red:
+
+**Rejected / Expired / Error**
+
+But status colors should remain secondary to the brand blue.
+
+---
+
+# Typography
+
+We want something modern and extremely readable.
+
+I'd go with a clean sans-serif family such as:
+
+**Inter** or **Plus Jakarta Sans**.
+
+My preference:
+
+### Headings
+
+**Plus Jakarta Sans**
+
+### Body/UI
+
+**Inter**
+
+That gives Blue Sky a polished property-tech feel without becoming unnecessarily fancy.
+
+---
+
+# Property photography
+
+This is **critical**.
+
+Use:
+
+* bright natural lighting
+* realistic Nigerian residential environments where possible
+* clean interiors
+* wide-angle architectural photography
+* no cheesy handshake photos
+* no fake smiling "agent pointing at house" stock photography
+
+The property is the hero.
+
+---
+
+# UI style
+
+### Cards
+
+Moderate radius.
+
+Not:
+
+> `border-radius: 40px` everywhere.
+
+Something around:
+
+**12–16px**
+
+### Shadows
+
+Very subtle.
+
+### Buttons
+
+Solid primary blue for important actions.
+
+Secondary buttons:
+
+Outlined / neutral.
+
+### Inputs
+
+Large touch targets.
+
+Minimum roughly:
+
+**44–48px height**
+
+because this is mobile-first.
+
+---
+
+# Verification visual language
+
+This should become one of Blue Sky's signature design elements.
+
+Example:
+
+```text
+✓ Verified Property
+```
+
+But don't just slap a blue badge everywhere.
+
+Verification should appear consistently:
+
+```text
+✓ Verified Property
+✓ Verified Provider
+✓ Payment Verified
+✓ Identity Verified
+```
+
+The user should immediately understand what has actually been verified.
+
+---
+
+# 🧭 Design hierarchy
+
+Every property screen should follow:
+
+```text
+IMAGE
+ ↓
+PROPERTY NAME
+ ↓
+LOCATION
+ ↓
+PRICE
+ ↓
+UNIT INFORMATION
+ ↓
+VERIFICATION
+ ↓
+DESCRIPTION
+ ↓
+AMENITIES
+ ↓
+LOCATION
+ ↓
+PROVIDER
+ ↓
+ACTION
+```
+
+The user shouldn't need to hunt for:
+
+> "How much is this?"
+
+or:
+
+> "Can I apply?"
+
+---
+
+# 🧱 Design system components
+
+Before building pages, we'll establish reusable components:
+
+### Navigation
+
+* Mobile header
+* Bottom navigation
+* Admin drawer
+* Provider drawer
+
+### Property
+
+* Property card
+* Property gallery
+* Property badge
+* Unit card
+* Amenity chip
+* Price display
+
+### Forms
+
+* Text input
+* Select
+* File upload
+* Image uploader
+* Stepper
+* Form validation
+* Review summary
+
+### Status
+
+* Status badge
+* Progress timeline
+* Verification badge
+* Alert
+* Notification
+
+### Dashboard
+
+* Metric card
+* Activity item
+* Data card
+* Filter bar
+* Search bar
+
+### Communication
+
+* Chat bubble
+* Conversation list
+* Message composer
+* FAQ response
+
+---
+
+# 🎨 The five design boards
+
+Now I think we're finally ready to generate.
+
+### Board 1 — Public Marketplace
+
+**Mobile-first**
+
+Include:
+
+* Home
+* Property search
+* Filter
+* Property cards
+* Property details
+* Apply CTA
+
+### Board 2 — Applicant Portal
+
+Include:
+
+* Login
+* Applicant dashboard
+* Application status
+* Application details
+* Document upload
+* Messages
+
+### Board 3 — Provider Portal
+
+Include:
+
+* Provider dashboard
+* Listing access
+* Plan selection
+* Payment proof
+* Properties
+* Add property
+* Verification status
+
+### Board 4 — Admin Portal
+
+Include:
+
+* Admin dashboard
+* Property management
+* Property review
+* Provider management
+* Payment verification
+* Application review
+* Admin property creation
+
+### Board 5 — System / Supporting UI
+
+Include:
+
+* Authentication
+* FAQ
+* Messages
+* Notifications
+* Settings
+* Empty states
+* Loading states
+* Error states
+
+---
+
+## One final UX decision I'd lock
+
+For the **public website**, the main CTA should be:
+
+> **Find a Property**
+
+For property owners:
+
+> **List Your Property**
+
+And throughout the product:
+
+> **Apply for Property**
+
+Those three actions establish the entire Blue Sky ecosystem:
+
+```text
+          BLUE SKY
+             │
+     ┌───────┴───────┐
+     │               │
+ FIND A PROPERTY   LIST PROPERTY
+     │               │
+     ▼               ▼
+ APPLICANT         PROVIDER
+     │               │
+     └───────┬───────┘
+             ▼
+       RENTAL SUCCESS
+```
+
+**At this point, I consider the UX architecture ready for visual generation.** The next step is to generate **Board 1: the mobile-first public marketplace**, then use that visual language as the foundation for the applicant, provider, and admin boards.
