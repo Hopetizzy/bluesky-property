@@ -135,36 +135,39 @@ export default function ApplyForPropertyPage() {
           setSelectedUnit(matchedUnit);
         }
 
-        // 2. Fetch Application Fee Settings from DB or store
-        if (isSupabaseConfigured()) {
-          const { data: feeData } = await supabase
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'application_fee')
-            .maybeSingle();
-
-          if (feeData?.value) {
-            setFeeSettings(feeData.value as ApplicationFeeSettings);
+        // 2. Fetch Live Application Fee Settings & Payment Methods
+        try {
+          const feeRes = await fetch('/api/settings/application-fee');
+          const feeJson = await feeRes.json();
+          if (feeJson.success && feeJson.data) {
+            setFeeSettings(feeJson.data as ApplicationFeeSettings);
           } else {
             setFeeSettings(store.getApplicationFeeSettings());
           }
+        } catch {
+          setFeeSettings(store.getApplicationFeeSettings());
+        }
 
-          // Fetch Payment Methods
-          const { data: methods } = await supabase
-            .from('payment_methods')
-            .select('*')
-            .eq('is_active', true);
-
-          if (methods && methods.length > 0) {
-            setPaymentMethods(methods);
-            setSelectedMethodId(methods[0].id);
+        try {
+          const pmRes = await fetch('/api/admin/payment-methods');
+          const pmJson = await pmRes.json();
+          if (pmJson.success && Array.isArray(pmJson.data) && pmJson.data.length > 0) {
+            const active = pmJson.data.filter((m: any) => m.is_active);
+            setPaymentMethods(active);
+            if (active.length > 0) setSelectedMethodId(active[0].id);
           } else {
             const localMethods = store.getPaymentMethods().filter((m) => m.is_active);
             setPaymentMethods(localMethods);
             if (localMethods.length > 0) setSelectedMethodId(localMethods[0].id);
           }
+        } catch {
+          const localMethods = store.getPaymentMethods().filter((m) => m.is_active);
+          setPaymentMethods(localMethods);
+          if (localMethods.length > 0) setSelectedMethodId(localMethods[0].id);
+        }
 
-          // 3. Fetch Logged-in User Profile
+        // 3. Fetch Logged-in User Profile
+        if (isSupabaseConfigured()) {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
             setUserId(user.id);

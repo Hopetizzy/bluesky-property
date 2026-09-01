@@ -316,6 +316,55 @@ export const INITIAL_PROPERTIES: Property[] = [
     amenities: ['Fenced Yard', 'EV Charger', 'Smart Home', 'Pet Friendly', 'Central A/C'],
     created_at: '2026-08-20T08:00:00Z',
   },
+  {
+    id: 'prop-6',
+    is_admin_direct: false,
+    provider_id: 'prov-2',
+    provider_name: 'Kensington Residential UK',
+    title: 'Luxury Sydney Harbour Penthouse',
+    slug: 'luxury-sydney-harbour-penthouse',
+    description:
+      'Prestigious waterfront penthouse in Circular Quay with uninterrupted Sydney Harbour and Opera House views. Features floor-to-ceiling double-glazed glass, marble chef kitchen, smart climate control, and 24/7 private concierge.',
+    property_type: 'penthouse',
+    country_code: 'AUS',
+    country_name: 'Australia',
+    state_province: 'New South Wales',
+    city: 'Sydney',
+    neighborhood: 'Circular Quay / CBD',
+    street_address: '1 Macquarie Street',
+    postal_code: '2000',
+    status: 'pending_verification',
+    featured: false,
+    images: [
+      {
+        id: 'img-10',
+        property_id: 'prop-6',
+        storage_path: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=800&q=80',
+        caption: 'Harbour Skyline View',
+        is_primary: true,
+        sort_order: 1,
+      },
+    ],
+    units: [
+      {
+        id: 'unit-7',
+        property_id: 'prop-6',
+        unit_number_or_name: 'Penthouse #3801',
+        unit_type: 'penthouse',
+        bedrooms: 3,
+        bathrooms: 3,
+        square_feet: 2200,
+        rent_amount: 5200,
+        currency_code: 'AUD',
+        security_deposit: 5200,
+        rent_period: 'monthly',
+        available_quantity: 1,
+        status: 'available',
+      },
+    ],
+    amenities: ['Harbour View', 'Concierge', 'Private Lift', 'Infinity Pool', 'Parking', 'Wine Cellar'],
+    created_at: '2026-08-22T14:30:00Z',
+  },
 ];
 
 // Pre-seeded Admin Dynamic Listing Plans
@@ -404,14 +453,30 @@ export const INITIAL_PROVIDER_PAYMENTS: ProviderPayment[] = [
     payment_method_name: 'Bank Wire / ACH Transfer',
     amount: 119,
     currency_code: 'USD',
-    proof_storage_path: 'wire_receipt_pacific_90d.pdf',
+    proof_storage_path: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1000&q=80',
     status: 'verified',
     submitted_at: '2026-08-01T10:00:00Z',
     verified_at: '2026-08-01T11:30:00Z',
-    verified_by: 'Admin Superuser',
+    verified_by: 'Super Admin',
   },
   {
     id: 'pay-2',
+    provider_id: 'prov-2',
+    provider_name: 'Kensington Residential UK',
+    listing_plan_id: 'plan-180',
+    listing_plan_name: '180 Days Listing Access',
+    payment_method_id: 'pm-wire',
+    payment_method_name: 'Bank Wire / ACH Transfer',
+    amount: 199,
+    currency_code: 'USD',
+    proof_storage_path: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=1000&q=80',
+    status: 'verified',
+    submitted_at: '2026-08-15T09:15:00Z',
+    verified_at: '2026-08-15T10:45:00Z',
+    verified_by: 'Super Admin',
+  },
+  {
+    id: 'pay-3',
     provider_id: 'prov-3',
     provider_name: 'Austin Premier Properties',
     listing_plan_id: 'plan-90',
@@ -420,9 +485,24 @@ export const INITIAL_PROVIDER_PAYMENTS: ProviderPayment[] = [
     payment_method_name: 'Zelle Payment',
     amount: 119,
     currency_code: 'USD',
-    proof_storage_path: 'zelle_confirmation_austin.png',
+    proof_storage_path: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=1000&q=80',
     status: 'pending',
-    submitted_at: '2026-08-20T14:20:00Z',
+    submitted_at: '2026-08-28T14:20:00Z',
+  },
+  {
+    id: 'pay-4',
+    provider_id: 'prov-4',
+    provider_name: 'Sydney Harbour Estates',
+    listing_plan_id: 'plan-365',
+    listing_plan_name: '365 Days Annual Listing Access',
+    payment_method_id: 'pm-wire',
+    payment_method_name: 'Bank Wire / ACH Transfer',
+    amount: 349,
+    currency_code: 'USD',
+    proof_storage_path: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=1000&q=80',
+    status: 'rejected',
+    rejection_reason: 'Bank transfer reference code unverified on corporate ledger. Please upload clear receipt showing remittance confirmation #.',
+    submitted_at: '2026-08-25T11:00:00Z',
   },
 ];
 
@@ -474,7 +554,7 @@ export const INITIAL_APPLICATIONS: RentalApplication[] = [
         application_id: 'app-1',
         document_type: 'drivers_license',
         file_name: 'california_dl_front.jpg',
-        storage_path: 'vault/app-1/dl_front.jpg',
+        storage_path: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80',
         status: 'verified',
         created_at: '2026-08-19T10:35:00Z',
       },
@@ -483,7 +563,7 @@ export const INITIAL_APPLICATIONS: RentalApplication[] = [
         application_id: 'app-1',
         document_type: 'proof_of_income',
         file_name: 'july_paystub_apex.pdf',
-        storage_path: 'vault/app-1/paystub.pdf',
+        storage_path: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=600&q=80',
         status: 'verified',
         created_at: '2026-08-19T10:36:00Z',
       },
@@ -492,7 +572,7 @@ export const INITIAL_APPLICATIONS: RentalApplication[] = [
         application_id: 'app-1',
         document_type: 'utility_bill_address',
         file_name: 'ladwp_utility_bill.pdf',
-        storage_path: 'vault/app-1/utility.pdf',
+        storage_path: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=600&q=80',
         status: 'pending',
         created_at: '2026-08-19T10:37:00Z',
       },
@@ -506,6 +586,12 @@ export const INITIAL_APPLICATIONS: RentalApplication[] = [
     applicant_name: 'John Doe',
     applicant_email: 'john.doe@example.com',
     applicant_phone: '+1 (213) 555-0199',
+    applicant_dob: '1992-05-14',
+    applicant_nationality: 'United States',
+    applicant_address: '450 Grand Ave, Apt 12B, Los Angeles, CA 90012',
+    applicant_employer: 'Apex Tech Solutions',
+    applicant_occupation: 'Senior Software Engineer',
+    applicant_income: 9500,
     property_id: 'prop-2',
     property_title: 'Luxury Studio Apartment',
     property_address: '290 Adelaide St W, Toronto, ON',
@@ -518,10 +604,99 @@ export const INITIAL_APPLICATIONS: RentalApplication[] = [
     lease_term_months: 12,
     occupants_count: 1,
     has_pets: false,
-    documents: [],
+    documents: [
+      {
+        id: 'doc-4',
+        application_id: 'app-2',
+        document_type: 'drivers_license',
+        file_name: 'passport_verified.jpg',
+        storage_path: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80',
+        status: 'verified',
+        created_at: '2026-08-10T14:20:00Z',
+      },
+    ],
     submitted_at: '2026-08-10T14:20:00Z',
     reviewed_at: '2026-08-12T16:00:00Z',
-    reviewed_by: 'Admin Superuser',
+    reviewed_by: 'Super Admin',
+  },
+  {
+    id: 'app-3',
+    application_ref: 'BS-10304',
+    applicant_id: 'user-sarah',
+    applicant_name: 'Sarah Jenkins',
+    applicant_email: 'sarah.jenkins@meridian-capital.co.uk',
+    applicant_phone: '+44 20 7946 0988',
+    applicant_dob: '1988-11-23',
+    applicant_nationality: 'United Kingdom',
+    applicant_address: '18 Chelsea Manor Street, London SW3 5RJ',
+    applicant_employer: 'Meridian Capital Partners',
+    applicant_occupation: 'Portfolio Director',
+    applicant_income: 14500,
+    property_id: 'prop-3',
+    property_title: '3 Bedroom Victorian Townhouse',
+    property_address: '14 Holland Park Gardens, London W14 8DY',
+    unit_id: 'unit-4',
+    unit_name: 'Entire Victorian House',
+    unit_rent: 4200,
+    unit_currency: 'GBP',
+    status: 'under_review',
+    desired_move_in: '2026-10-01',
+    lease_term_months: 24,
+    occupants_count: 3,
+    has_pets: true,
+    additional_notes: 'Family relocation. Long-term corporate lease preferred. Excellent references available upon request.',
+    documents: [
+      {
+        id: 'doc-5',
+        application_id: 'app-3',
+        document_type: 'drivers_license',
+        file_name: 'uk_passport_scan.jpg',
+        storage_path: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80',
+        status: 'verified',
+        created_at: '2026-08-28T09:00:00Z',
+      },
+      {
+        id: 'doc-6',
+        application_id: 'app-3',
+        document_type: 'proof_of_income',
+        file_name: 'executive_compensation_letter.pdf',
+        storage_path: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?auto=format&fit=crop&w=600&q=80',
+        status: 'verified',
+        created_at: '2026-08-28T09:05:00Z',
+      },
+    ],
+    submitted_at: '2026-08-28T09:00:00Z',
+  },
+  {
+    id: 'app-4',
+    application_ref: 'BS-10189',
+    applicant_id: 'user-michael',
+    applicant_name: 'Michael Chang',
+    applicant_email: 'm.chang@freemail.net',
+    applicant_phone: '+1 (512) 555-0182',
+    applicant_dob: '1995-03-08',
+    applicant_nationality: 'United States',
+    applicant_address: '701 Brazos St, Austin, TX 78701',
+    applicant_employer: 'Freelance Design',
+    applicant_occupation: 'Contractor',
+    applicant_income: 3100,
+    property_id: 'prop-5',
+    property_title: '2 Bedroom Modern Duplex',
+    property_address: '1904 S Congress Ave, Austin, TX',
+    unit_id: 'unit-7',
+    unit_name: 'Unit A - Ground Suite',
+    unit_rent: 2200,
+    unit_currency: 'USD',
+    status: 'rejected',
+    desired_move_in: '2026-09-01',
+    lease_term_months: 6,
+    occupants_count: 1,
+    has_pets: false,
+    additional_notes: 'Looking for short term lease while on assignment.',
+    documents: [],
+    submitted_at: '2026-08-24T16:15:00Z',
+    reviewed_at: '2026-08-25T11:00:00Z',
+    reviewed_by: 'Super Admin',
   },
 ];
 
@@ -684,13 +859,37 @@ class DataStore {
     }
   }
 
-  // Active User Role
+  // Active User Role & Session Management
   public getRole(): UserRole {
     return this.getItem<UserRole>('role', 'applicant');
   }
 
   public setRole(role: UserRole): void {
     this.setItem('role', role);
+  }
+
+  public getCurrentUser(): { id: string; email: string; full_name: string; role: UserRole } | null {
+    return this.getItem<any>('current_user', null);
+  }
+
+  public setCurrentUser(user: { id: string; email: string; full_name: string; role: UserRole } | null): void {
+    this.setItem('current_user', user);
+    if (user) {
+      this.setItem('role', user.role);
+      this.setItem('is_authenticated', true);
+    } else {
+      this.setItem('is_authenticated', false);
+    }
+  }
+
+  public isAuthenticated(): boolean {
+    return this.getItem<boolean>('is_authenticated', false);
+  }
+
+  public clearSession(): void {
+    this.setItem('current_user', null);
+    this.setItem('is_authenticated', false);
+    this.setItem('role', 'applicant');
   }
 
   // Properties
@@ -742,6 +941,11 @@ class DataStore {
     this.setItem('listing_plans', plans);
   }
 
+  public deleteListingPlan(planId: string): void {
+    const plans = this.getListingPlans().filter((p) => p.id !== planId);
+    this.setItem('listing_plans', plans);
+  }
+
   // Payment Methods
   public getPaymentMethods(): PaymentMethod[] {
     return this.getItem<PaymentMethod[]>('payment_methods', INITIAL_PAYMENT_METHODS);
@@ -755,6 +959,11 @@ class DataStore {
     } else {
       methods.push(method);
     }
+    this.setItem('payment_methods', methods);
+  }
+
+  public deletePaymentMethod(methodId: string): void {
+    const methods = this.getPaymentMethods().filter((m) => m.id !== methodId);
     this.setItem('payment_methods', methods);
   }
 

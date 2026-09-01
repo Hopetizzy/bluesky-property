@@ -3,6 +3,56 @@ import { store } from '../store';
 import { Property, PropertyUnit, PropertyImage } from '../types';
 
 export const propertiesDb = {
+  // 0. Get all properties for Admin Suite (including pending, approved, rejected)
+  async getAllPropertiesForAdmin(): Promise<Property[]> {
+    // 1. Try Next.js Server-Side Service Role API endpoint (bypasses RLS, gets all live DB rows including pending)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/admin/properties');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          if (json.data.length > 0) {
+            json.data.forEach((p: Property) => store.saveProperty(p));
+            return json.data;
+          }
+          return [];
+        }
+      } catch (apiErr) {
+        console.warn('API /api/admin/properties GET note, falling back to direct client:', apiErr);
+      }
+    }
+
+    if (!isSupabaseConfigured()) {
+      return store.getProperties();
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select(`
+          *,
+          property_images (id, storage_path, caption, is_primary, sort_order),
+          property_units (id, unit_number_or_name, unit_type, bedrooms, bathrooms, square_feet, rent_amount, currency_code, security_deposit, rent_period, available_quantity, status),
+          property_amenities (amenity:amenities (name))
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return (data || []).map((row: any) => ({
+          ...row,
+          images: row.property_images || [],
+          units: row.property_units || [],
+          amenities: (row.property_amenities || []).map((pa: any) => pa.amenity?.name).filter(Boolean),
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.warn('Supabase admin properties fetch note:', err);
+      return store.getProperties();
+    }
+  },
+
   // 1. Get all approved active properties visible publicly
   async getPublicProperties(): Promise<Property[]> {
     if (!isSupabaseConfigured()) {
@@ -101,8 +151,37 @@ export const propertiesDb = {
 
   // 3. Save / Upsert Property with units and images
   async saveProperty(property: Property): Promise<Property> {
+    // 1. Try Next.js Server-Side Service Role API endpoint (guarantees DB write)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/admin/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(property),
+        });
+        const rawText = await res.text();
+        let json: any = {};
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          throw new Error(rawText || `Server responded with status ${res.status}`);
+        }
+
+        if (json.success && json.data) {
+          store.saveProperty(json.data);
+          return json.data;
+        } else if (json && json.success === false) {
+          throw new Error(json.error || 'Failed to save property to database');
+        }
+      } catch (apiErr: any) {
+        console.error('API /api/admin/properties save error:', apiErr);
+        throw apiErr;
+      }
+    }
+
     store.saveProperty(property);
 
+    // 2. Direct Supabase Client fallback
     if (isSupabaseConfigured()) {
       try {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(property.id);
@@ -196,7 +275,7 @@ export const propertiesDb = {
   // 4. Update Property Verification Status (Admin Approve / Reject)
   async setPropertyStatus(id: string, status: Property['status'], notes?: string): Promise<void> {
     const properties = store.getProperties();
-    const target = properties.find((p) => p.id === id);
+    const target = properties.find((p) => p.id === id || p.slug === id);
     if (target) {
       target.status = status;
       if (notes) target.verification_notes = notes;
@@ -204,34 +283,79 @@ export const propertiesDb = {
       store.saveProperty(target);
     }
 
+    // 1. Try Next.js Server-Side Service Role API endpoint
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/admin/properties', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id,
+            status,
+            verification_notes: notes || null,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) return;
+      } catch (apiErr) {
+        console.warn('API /api/admin/properties PATCH note:', apiErr);
+      }
+    }
+
+    // 2. Direct client fallback
     if (isSupabaseConfigured()) {
-      await supabase
-        .from('properties')
-        .update({
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        const payload = {
           status: status,
           verification_notes: notes || null,
           verified_at: status === 'approved' ? new Date().toISOString() : null,
           published_at: status === 'approved' ? new Date().toISOString() : null,
-        })
-        .eq('id', id);
+        };
+        if (isUuid) {
+          await supabase.from('properties').update(payload).eq('id', id);
+        } else {
+          await supabase.from('properties').update(payload).eq('slug', id);
+        }
+      } catch (err) {
+        console.error('Supabase setPropertyStatus error:', err);
+      }
     }
   },
 
   // 5. Toggle Featured Status (Admin)
   async toggleFeatured(id: string, featured: boolean): Promise<void> {
     const properties = store.getProperties();
-    const target = properties.find((p) => p.id === id);
+    const target = properties.find((p) => p.id === id || p.slug === id);
     if (target) {
       target.featured = featured;
       store.saveProperty(target);
     }
 
+    // 1. Try Next.js Server-Side Service Role API endpoint
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/admin/properties', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, featured }),
+        });
+        const json = await res.json();
+        if (json.success) return;
+      } catch (apiErr) {
+        console.warn('API /api/admin/properties PATCH note:', apiErr);
+      }
+    }
+
+    // 2. Direct client fallback
     if (isSupabaseConfigured()) {
       try {
-        await supabase
-          .from('properties')
-          .update({ featured: featured })
-          .eq('id', id);
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (isUuid) {
+          await supabase.from('properties').update({ featured }).eq('id', id);
+        } else {
+          await supabase.from('properties').update({ featured }).eq('slug', id);
+        }
       } catch (err) {
         console.error('Supabase toggleFeatured error:', err);
       }

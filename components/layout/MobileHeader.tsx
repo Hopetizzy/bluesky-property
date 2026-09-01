@@ -1,7 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Bell, User, LogOut, LayoutDashboard, FileText, Shield, MessageSquare, Search, Building } from 'lucide-react';
+import {
+  Bell,
+  User,
+  LogOut,
+  LayoutDashboard,
+  FileText,
+  Shield,
+  MessageSquare,
+  Search,
+  Building,
+  CreditCard,
+  Users,
+  ShieldCheck,
+  Sparkles,
+  Settings,
+} from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { store } from '@/lib/store';
 import { UserRole } from '@/lib/types';
@@ -56,6 +71,12 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         }
       }
 
+      const currentUser = store.getCurrentUser();
+      if (currentUser) {
+        setUserName(currentUser.full_name);
+        setRole(currentUser.role);
+      }
+
       const notifs = store.getNotifications();
       setUnreadNotifs(notifs.filter((n) => !n.is_read).length);
     }
@@ -69,10 +90,14 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 
   const handleSignOut = async () => {
     if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('Sign out error:', err);
+      }
     }
-    store.setRole('applicant');
-    router.push('/');
+    store.clearSession();
+    router.replace('/');
   };
 
   const applicantNavLinks = [
@@ -91,10 +116,24 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     { label: 'Notifications', href: '/notifications', icon: Bell },
   ];
 
-  const activeLinks =
-    currentPath.startsWith('/provider') || role === 'provider'
-      ? providerNavLinks
-      : applicantNavLinks;
+  const adminNavLinks = [
+    { label: 'Overview', href: '/admin', icon: LayoutDashboard },
+    { label: 'Properties', href: '/admin/properties', icon: Building },
+    { label: 'Payments', href: '/admin/payments', icon: CreditCard },
+    { label: 'Applications', href: '/admin/applications', icon: FileText },
+    { label: 'Providers', href: '/admin/providers', icon: Users },
+    { label: 'Plans & Fees', href: '/admin/plans', icon: Shield },
+    { label: 'Settings', href: '/settings', icon: Settings },
+  ];
+
+  const isAdminRoute = currentPath.startsWith('/admin') || role === 'admin';
+  const isProviderRoute = currentPath.startsWith('/provider') || role === 'provider';
+
+  const activeLinks = isAdminRoute
+    ? adminNavLinks
+    : isProviderRoute
+    ? providerNavLinks
+    : applicantNavLinks;
 
   return (
     <header
@@ -102,12 +141,14 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         position: 'sticky',
         top: 0,
         zIndex: 100,
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        backgroundColor: isAdminRoute ? '#0F172A' : 'rgba(255, 255, 255, 0.98)',
+        color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--color-border)',
+        borderBottom: isAdminRoute ? '1px solid #1E293B' : '1px solid var(--color-border)',
         height: 70,
-        boxShadow: 'var(--shadow-sm)',
+        boxShadow: isAdminRoute ? '0 4px 20px rgba(0, 0, 0, 0.25)' : 'var(--shadow-sm)',
+        transition: 'background-color 0.2s ease, border-color 0.2s ease',
       }}
     >
       <div
@@ -121,9 +162,9 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           padding: '0 20px',
         }}
       >
-        {/* Brand Logo */}
+        {/* Brand Logo & Context */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link href={isAdminRoute ? '/admin' : '/'} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <img
               src="/Logo.png"
               alt="Blue Sky"
@@ -133,11 +174,27 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               }}
             />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              <span
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.1,
+                }}
+              >
                 Blue Sky
               </span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-primary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                {role === 'provider' ? 'Landlord Portal' : role === 'admin' ? 'Admin Portal' : 'Tenant Portal'}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: isAdminRoute ? '#38BDF8' : 'var(--color-primary)',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {isAdminRoute ? 'Admin Portal' : isProviderRoute ? 'Landlord Portal' : 'Tenant Portal'}
               </span>
             </div>
           </Link>
@@ -148,15 +205,18 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           style={{
             display: 'none',
             alignItems: 'center',
-            gap: 8,
+            gap: 6,
           }}
           className="desktop-portal-nav"
         >
           {activeLinks.map((link) => {
             const Icon = link.icon;
-            const isActive = link.href === '/applicant'
-              ? currentPath === '/applicant'
-              : currentPath.startsWith(link.href);
+            const isActive =
+              link.href === '/admin'
+                ? currentPath === '/admin'
+                : link.href === '/applicant'
+                ? currentPath === '/applicant'
+                : currentPath.startsWith(link.href);
 
             return (
               <Link
@@ -170,32 +230,49 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                   borderRadius: 'var(--radius-md)',
                   fontSize: 13,
                   fontWeight: isActive ? 700 : 600,
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-navy-muted)',
-                  backgroundColor: isActive ? 'var(--color-primary-tint)' : 'transparent',
+                  color: isAdminRoute
+                    ? isActive
+                      ? '#38BDF8'
+                      : '#94A3B8'
+                    : isActive
+                    ? 'var(--color-primary)'
+                    : 'var(--color-navy-muted)',
+                  backgroundColor: isAdminRoute
+                    ? isActive
+                      ? 'rgba(56, 189, 248, 0.15)'
+                      : 'transparent'
+                    : isActive
+                    ? 'var(--color-primary-tint)'
+                    : 'transparent',
                   transition: 'all 0.15s ease',
+                  textDecoration: 'none',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = 'var(--color-surface-subtle)';
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = isAdminRoute ? 'rgba(255, 255, 255, 0.05)' : 'var(--color-surface-subtle)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }
                 }}
               >
-                <Icon size={16} color={isActive ? 'var(--color-primary)' : 'currentColor'} />
+                <Icon size={16} color={isActive ? (isAdminRoute ? '#38BDF8' : 'var(--color-primary)') : 'currentColor'} />
                 <span>{link.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Mobile Title */}
+        {/* Mobile Header Title */}
         {title && (
           <div
             className="mobile-header-title"
             style={{
               fontSize: 15,
               fontWeight: 800,
-              color: 'var(--color-navy-dark)',
+              color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
               textAlign: 'center',
               display: 'block',
             }}
@@ -204,8 +281,25 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           </div>
         )}
 
-        {/* Right Actions: Notification Bell & Sign Out */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {/* Right Actions: Identity, Notifications & Sign Out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Identity Tag (Desktop) */}
+          {userName && (
+            <div
+              className="desktop-username-tag"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: isAdminRoute ? '#94A3B8' : 'var(--color-text-secondary)',
+                marginRight: 4,
+              }}
+            >
+              {isAdminRoute
+                ? userName.replace(/Super Admin Operations/gi, 'Admin').replace(/Super Admin/gi, 'Admin')
+                : userName}
+            </div>
+          )}
+
           <Link
             href="/notifications"
             style={{
@@ -216,9 +310,10 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
               width: 40,
               height: 40,
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--color-surface-subtle)',
-              color: 'var(--color-navy-dark)',
+              backgroundColor: isAdminRoute ? '#1E293B' : 'var(--color-surface-subtle)',
+              color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
               transition: 'all 0.15s ease',
+              textDecoration: 'none',
             }}
             aria-label={`Notifications (${unreadNotifs} unread)`}
           >
@@ -248,32 +343,34 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             )}
           </Link>
 
-          {/* User Display & Sign Out Button */}
+          {/* Secure Sign Out Button */}
           <button
             onClick={handleSignOut}
-            title="Sign Out"
+            title="Secure Sign Out"
             style={{
               background: 'none',
-              border: '1px solid var(--color-border)',
+              border: isAdminRoute ? '1px solid #334155' : '1px solid var(--color-border)',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              color: 'var(--color-navy-dark)',
+              color: isAdminRoute ? '#EF4444' : 'var(--color-navy-dark)',
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 600,
               padding: '8px 14px',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--color-white)',
+              backgroundColor: isAdminRoute ? 'rgba(239, 68, 68, 0.1)' : 'var(--color-white)',
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = 'var(--color-danger)';
               e.currentTarget.style.color = 'var(--color-danger)';
+              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.color = 'var(--color-navy-dark)';
+              e.currentTarget.style.borderColor = isAdminRoute ? '#334155' : 'var(--color-border)';
+              e.currentTarget.style.color = isAdminRoute ? '#EF4444' : 'var(--color-navy-dark)';
+              e.currentTarget.style.backgroundColor = isAdminRoute ? 'rgba(239, 68, 68, 0.1)' : 'var(--color-white)';
             }}
           >
             <LogOut size={16} />
@@ -288,6 +385,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             display: flex !important;
           }
           :global(.mobile-header-title) {
+            display: none !important;
+          }
+        }
+        @media (max-width: 768px) {
+          :global(.desktop-username-tag) {
             display: none !important;
           }
         }

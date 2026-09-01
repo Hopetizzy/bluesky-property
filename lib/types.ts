@@ -126,10 +126,14 @@ export interface ProviderPayment {
   id: string;
   provider_id: string;
   provider_name?: string;
+  provider_email?: string;
+  provider_phone?: string;
   listing_plan_id: string;
   listing_plan_name?: string;
+  listing_plan_duration_days?: number;
   payment_method_id: string;
   payment_method_name?: string;
+  payment_method_type?: string;
   amount: number;
   currency_code: string;
   proof_storage_path: string;
@@ -236,10 +240,13 @@ export interface RentalApplication {
   property_id: string;
   property_title: string;
   property_address: string;
+  property_image?: string;
   unit_id: string;
   unit_name: string;
   unit_rent: number;
   unit_currency: string;
+  unit_bedrooms?: number;
+  unit_bathrooms?: number;
   status: ApplicationStatus;
   desired_move_in: string;
   lease_term_months: number;

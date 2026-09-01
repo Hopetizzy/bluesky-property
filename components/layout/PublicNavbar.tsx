@@ -36,9 +36,17 @@ export const PublicNavbar: React.FC = () => {
         }
       }
 
-      // Check if store has role and user is in app
-      const activeRole = store.getRole();
-      setUserRole(activeRole);
+      // Check store local session
+      if (store.isAuthenticated()) {
+        const currentUser = store.getCurrentUser();
+        setIsLoggedIn(true);
+        if (currentUser) {
+          setUserRole(currentUser.role);
+          setUserName(currentUser.full_name);
+        }
+      } else {
+        setIsLoggedIn(false);
+      }
     }
 
     checkAuth();
@@ -46,11 +54,15 @@ export const PublicNavbar: React.FC = () => {
 
   const handleSignOut = async () => {
     if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn('Sign out note:', err);
+      }
     }
     setIsLoggedIn(false);
-    store.setRole('applicant');
-    router.push('/');
+    store.clearSession();
+    router.replace('/auth/login');
   };
 
   const getDashboardPath = () => {

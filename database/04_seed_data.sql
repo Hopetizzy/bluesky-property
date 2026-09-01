@@ -86,7 +86,8 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Prop 5: Austin Duplex (Pending Verification)
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured) VALUES
-    ('20000001-0000-0000-0000-000000000005', 'e0000001-0000-0000-0000-000000000003', FALSE, '2 Bedroom Modern Duplex', '2-bedroom-modern-duplex-austin', 'Newly constructed Austin duplex with fenced yard, EV charging, polished concrete floors, and smart home automation.', 'duplex', 'USA', 'United States', 'Texas', 'Austin', 'South Congress', '1904 S Congress Ave', '78704', 'pending_verification', FALSE)
+    ('20000001-0000-0000-0000-000000000005', 'e0000001-0000-0000-0000-000000000003', FALSE, '2 Bedroom Modern Duplex', '2-bedroom-modern-duplex-austin', 'Newly constructed Austin duplex with fenced yard, EV charging, polished concrete floors, and smart home automation.', 'duplex', 'USA', 'United States', 'Texas', 'Austin', 'South Congress', '1904 S Congress Ave', '78704', 'pending_verification', FALSE),
+    ('20000001-0000-0000-0000-000000000006', 'e0000001-0000-0000-0000-000000000002', FALSE, 'Luxury Sydney Harbour Penthouse', 'luxury-sydney-harbour-penthouse', 'Prestigious waterfront penthouse in Circular Quay with uninterrupted Sydney Harbour and Opera House views.', 'penthouse', 'AUS', 'Australia', 'New South Wales', 'Sydney', 'Circular Quay / CBD', '1 Macquarie Street', '2000', 'pending_verification', FALSE)
 ON CONFLICT (id) DO NOTHING;
 
 -- 8. Property Units (Multi-Unit Configurations)
@@ -96,7 +97,8 @@ INSERT INTO public.property_units (id, property_id, unit_number_or_name, unit_ty
     ('30000001-0000-0000-0000-000000000003', '20000001-0000-0000-0000-000000000002', 'Studio Loft #1105', 'studio', 0, 1.0, 520, 1950.00, 'CAD', 1950.00, 'monthly', 1, 'available', 'Furnished modern studio with Murphy bed.'),
     ('30000001-0000-0000-0000-000000000004', '20000001-0000-0000-0000-000000000003', 'Whole Townhouse', 'three_bedroom', 3, 2.5, 1850, 3400.00, 'GBP', 3400.00, 'monthly', 1, 'available', 'Complete multi-level residence with garden patio.'),
     ('30000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000004', 'Waterfront Suite #1802', 'one_bedroom', 1, 1.0, 690, 2400.00, 'CAD', 1200.00, 'monthly', 1, 'available', 'Bright open layout with high ceilings.'),
-    ('30000001-0000-0000-0000-000000000006', '20000001-0000-0000-0000-000000000005', 'Unit A', 'two_bedroom', 2, 2.0, 1200, 2600.00, 'USD', 2600.00, 'monthly', 1, 'available', 'Austin modern duplex with fenced yard.')
+    ('30000001-0000-0000-0000-000000000006', '20000001-0000-0000-0000-000000000005', 'Unit A', 'two_bedroom', 2, 2.0, 1200, 2600.00, 'USD', 2600.00, 'monthly', 1, 'available', 'Austin modern duplex with fenced yard.'),
+    ('30000001-0000-0000-0000-000000000007', '20000001-0000-0000-0000-000000000006', 'Penthouse #3801', 'penthouse', 3, 3.0, 2200, 5200.00, 'AUD', 5200.00, 'monthly', 1, 'available', 'Luxury Sydney Harbour Penthouse.')
 ON CONFLICT (id) DO NOTHING;
 
 -- 9. Property Images
@@ -105,7 +107,8 @@ INSERT INTO public.property_images (id, property_id, storage_path, caption, is_p
     ('40000001-0000-0000-0000-000000000002', '20000001-0000-0000-0000-000000000001', 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80', 'Living Room', FALSE, 2),
     ('40000001-0000-0000-0000-000000000003', '20000001-0000-0000-0000-000000000002', 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80', 'Studio Space', TRUE, 1),
     ('40000001-0000-0000-0000-000000000004', '20000001-0000-0000-0000-000000000003', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80', 'Victorian Front', TRUE, 1),
-    ('40000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000004', 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', 'Waterfront Balcony', TRUE, 1)
+    ('40000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000004', 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80', 'Waterfront Balcony', TRUE, 1),
+    ('40000001-0000-0000-0000-000000000006', '20000001-0000-0000-0000-000000000006', 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=800&q=80', 'Harbour Skyline View', TRUE, 1)
 ON CONFLICT (id) DO NOTHING;
 
 -- 10. Link Property Amenities
