@@ -485,7 +485,19 @@ export default function ProviderPaymentPage() {
                               {method.name}
                             </span>
                           </div>
-                          <Badge variant="info">{method.type.replace('_', ' ').toUpperCase()}</Badge>
+                          <Badge variant={isSelected ? 'primary' : 'info'}>
+                            {method.type === 'interac_etransfer'
+                              ? '🇨🇦 INTERAC'
+                              : method.type === 'bitcoin'
+                              ? '⚡ BITCOIN'
+                              : method.type === 'cash_app'
+                              ? '💵 CASH APP'
+                              : method.type === 'chime'
+                              ? '🟢 CHIME'
+                              : method.type === 'facebook_pay'
+                              ? '🔵 META PAY'
+                              : method.type.toUpperCase()}
+                          </Badge>
                         </div>
                       );
                     })}
@@ -505,25 +517,32 @@ export default function ProviderPaymentPage() {
                         Official Transfer Details:
                       </div>
 
-                      {activeMethod.bank_name && (
-                        <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>Bank Name:</span>
-                          <strong>{activeMethod.bank_name}</strong>
-                        </div>
-                      )}
-
                       {activeMethod.account_name && (
                         <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>Account Name:</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>Beneficiary / Account:</span>
                           <strong>{activeMethod.account_name}</strong>
                         </div>
                       )}
 
                       {activeMethod.account_number && (
                         <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>Account Number / IBAN:</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>
+                            {activeMethod.type === 'bitcoin'
+                              ? 'BTC Wallet Address:'
+                              : activeMethod.type === 'cash_app'
+                              ? 'Cash App $Cashtag:'
+                              : activeMethod.type === 'chime'
+                              ? 'Chime Sign / Email:'
+                              : activeMethod.type === 'facebook_pay'
+                              ? 'Facebook Pay Tag / ID:'
+                              : activeMethod.type === 'interac_etransfer'
+                              ? 'Interac Recipient Email:'
+                              : 'Account / Identifier:'}
+                          </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <strong style={{ fontFamily: 'monospace' }}>{activeMethod.account_number}</strong>
+                            <strong style={{ fontFamily: activeMethod.type === 'bitcoin' ? 'monospace' : 'inherit', color: 'var(--color-primary)' }}>
+                              {activeMethod.account_number}
+                            </strong>
                             <button
                               type="button"
                               onClick={() => handleCopy(activeMethod.account_number!, 'acct')}
@@ -538,9 +557,11 @@ export default function ProviderPaymentPage() {
 
                       {activeMethod.routing_or_swift && (
                         <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>SWIFT / Routing:</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>
+                            {activeMethod.type === 'bitcoin' ? 'Blockchain Network:' : 'Network / Sub-Detail:'}
+                          </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <strong style={{ fontFamily: 'monospace' }}>{activeMethod.routing_or_swift}</strong>
+                            <strong>{activeMethod.routing_or_swift}</strong>
                             <button
                               type="button"
                               onClick={() => handleCopy(activeMethod.routing_or_swift!, 'swift')}
@@ -553,37 +574,10 @@ export default function ProviderPaymentPage() {
                         </div>
                       )}
 
-                      {activeMethod.zelle_identifier && (
+                      {activeMethod.bank_name && (
                         <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>Zelle Handle:</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <strong style={{ color: 'var(--color-primary)' }}>{activeMethod.zelle_identifier}</strong>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(activeMethod.zelle_identifier!, 'zelle')}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}
-                              title="Copy"
-                            >
-                              <Copy size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {activeMethod.paypal_email && (
-                        <div className="flex-between" style={{ fontSize: 12, marginBottom: 6 }}>
-                          <span style={{ color: 'var(--color-text-secondary)' }}>PayPal Recipient:</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <strong>{activeMethod.paypal_email}</strong>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(activeMethod.paypal_email!, 'paypal')}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}
-                              title="Copy"
-                            >
-                              <Copy size={13} />
-                            </button>
-                          </div>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>Platform / Institution:</span>
+                          <strong>{activeMethod.bank_name}</strong>
                         </div>
                       )}
 

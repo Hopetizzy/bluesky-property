@@ -15,18 +15,22 @@ import {
   ArrowRight,
   Filter,
   RotateCcw,
+  Globe2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PropertyCard } from '@/components/property/PropertyCard';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { propertiesDb } from '@/lib/db';
 import { Property } from '@/lib/types';
+import { SUPPORTED_REGIONS, getStatesForCountry } from '@/lib/constants';
 
 export default function PropertiesExplorePage() {
   const router = useRouter();
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('');
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
 
@@ -58,9 +62,13 @@ export default function PropertiesExplorePage() {
 
       const locationParam = router.query.location as string;
       const typeParam = router.query.type as string;
+      const countryParam = router.query.country as string;
+      const stateParam = router.query.state as string;
 
       if (locationParam) setSearchQuery(locationParam);
       if (typeParam) setSelectedType(typeParam);
+      if (countryParam) setSelectedCountry(countryParam);
+      if (stateParam) setSelectedState(stateParam);
     }
     loadProperties();
   }, [router.query]);
@@ -68,6 +76,22 @@ export default function PropertiesExplorePage() {
   // Execute filtering
   useEffect(() => {
     let result = [...properties];
+
+    if (selectedCountry) {
+      result = result.filter(
+        (p) =>
+          p.country_code.toUpperCase() === selectedCountry.toUpperCase() ||
+          p.country_name.toLowerCase().includes(selectedCountry.toLowerCase())
+      );
+    }
+
+    if (selectedState) {
+      result = result.filter(
+        (p) =>
+          p.state_province.toLowerCase() === selectedState.toLowerCase() ||
+          p.state_province.toLowerCase().includes(selectedState.toLowerCase())
+      );
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -116,7 +140,7 @@ export default function PropertiesExplorePage() {
     }
 
     setFilteredProperties(result);
-  }, [properties, searchQuery, selectedType, selectedBeds, maxRent, selectedAmenities, sortBy]);
+  }, [properties, selectedCountry, selectedState, searchQuery, selectedType, selectedBeds, maxRent, selectedAmenities, sortBy]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -132,7 +156,14 @@ export default function PropertiesExplorePage() {
     }
   };
 
+  const handleCountryFilterChange = (cCode: string) => {
+    setSelectedCountry(cCode);
+    setSelectedState('');
+  };
+
   const handleResetFilters = () => {
+    setSelectedCountry('');
+    setSelectedState('');
     setSelectedType('all');
     setSelectedBeds('all');
     setMaxRent(6000);
@@ -141,9 +172,11 @@ export default function PropertiesExplorePage() {
     setSearchQuery('');
   };
 
+  const availableStates = getStatesForCountry(selectedCountry);
+
   return (
     <AppLayout
-      title="Explore Verified Properties Worldwide | Blue Sky"
+      title="Explore Verified Properties | Blue Sky Property Management"
       isPublic={true}
     >
       {/* =========================================================================
@@ -172,11 +205,11 @@ export default function PropertiesExplorePage() {
                   Explore Rental Properties
                 </h1>
                 <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                  100% verified homes with multi-unit floorplans across USA, Canada, UK, and Australia
+                  100% verified homes with multi-unit floorplans across United States & Canada
                 </p>
               </div>
 
-              {(selectedAmenities.length > 0 || selectedType !== 'all' || selectedBeds !== 'all' || searchQuery) && (
+              {(selectedCountry || selectedState || selectedAmenities.length > 0 || selectedType !== 'all' || selectedBeds !== 'all' || searchQuery) && (
                 <button
                   onClick={handleResetFilters}
                   style={{
@@ -200,18 +233,48 @@ export default function PropertiesExplorePage() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 12,
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                gap: 10,
                 alignItems: 'center',
               }}
             >
-              {/* Search by City/Address */}
-              <div style={{ position: 'relative', minWidth: 240 }}>
+              {/* 1. Country Filter */}
+              <select
+                value={selectedCountry}
+                onChange={(e) => handleCountryFilterChange(e.target.value)}
+                className="form-select"
+                style={{ height: 46, backgroundColor: 'var(--color-surface-subtle)', fontWeight: 600 }}
+              >
+                <option value="">All Countries</option>
+                {SUPPORTED_REGIONS.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.flag} {c.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* 2. State / Province Filter */}
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="form-select"
+                style={{ height: 46, backgroundColor: 'var(--color-surface-subtle)', fontWeight: 600 }}
+              >
+                <option value="">{selectedCountry ? 'All States / Prov.' : 'All States / Prov.'}</option>
+                {availableStates.map((s) => (
+                  <option key={s.code} value={s.name}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </select>
+
+              {/* 3. Search by City/Address */}
+              <div style={{ position: 'relative' }}>
                 <Search
-                  size={18}
+                  size={17}
                   style={{
                     position: 'absolute',
-                    left: 14,
+                    left: 12,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     color: 'var(--color-primary)',
@@ -219,18 +282,18 @@ export default function PropertiesExplorePage() {
                 />
                 <input
                   type="text"
-                  placeholder="Search by city, state, or address..."
+                  placeholder="City or address..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="form-input"
-                  style={{ paddingLeft: 42, height: 46, backgroundColor: 'var(--color-surface-subtle)' }}
+                  style={{ paddingLeft: 36, height: 46, backgroundColor: 'var(--color-surface-subtle)' }}
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
                     style={{
                       position: 'absolute',
-                      right: 12,
+                      right: 10,
                       top: '50%',
                       transform: 'translateY(-50%)',
                       background: 'none',
@@ -239,12 +302,12 @@ export default function PropertiesExplorePage() {
                       cursor: 'pointer',
                     }}
                   >
-                    <X size={16} />
+                    <X size={15} />
                   </button>
                 )}
               </div>
 
-              {/* Property Type Dropdown */}
+              {/* 4. Property Type Dropdown */}
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
@@ -253,14 +316,13 @@ export default function PropertiesExplorePage() {
               >
                 <option value="all">All Property Types</option>
                 <option value="apartment">Apartments</option>
-                <option value="studio">Studios</option>
+                <option value="house">Houses</option>
                 <option value="townhouse">Townhouses</option>
-                <option value="condo">Condos</option>
-                <option value="penthouse">Penthouses</option>
                 <option value="duplex">Duplexes</option>
+                <option value="studio">Studios</option>
               </select>
 
-              {/* Bedrooms Dropdown */}
+              {/* 5. Bedrooms Dropdown */}
               <select
                 value={selectedBeds}
                 onChange={(e) => setSelectedBeds(e.target.value)}
@@ -274,8 +336,8 @@ export default function PropertiesExplorePage() {
                 <option value="3">3+ Bedrooms</option>
               </select>
 
-              {/* Filter Sheet & Sort Triggers */}
-              <div style={{ display: 'flex', gap: 10 }}>
+              {/* 6. Filter Sheet & Sort */}
+              <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
                   onClick={() => setIsMobileFilterOpen(true)}
@@ -283,23 +345,25 @@ export default function PropertiesExplorePage() {
                   style={{
                     flex: 1,
                     height: 46,
+                    padding: '0 10px',
+                    fontSize: 12,
                     backgroundColor: selectedAmenities.length > 0 ? 'var(--color-primary-tint)' : 'var(--color-surface-subtle)',
                     color: selectedAmenities.length > 0 ? 'var(--color-primary)' : 'var(--color-navy-dark)',
                     borderColor: selectedAmenities.length > 0 ? 'var(--color-primary)' : 'var(--color-border)',
                   }}
                 >
-                  <SlidersHorizontal size={16} /> More Filters {selectedAmenities.length > 0 ? `(${selectedAmenities.length})` : ''}
+                  <SlidersHorizontal size={14} /> More {selectedAmenities.length > 0 ? `(${selectedAmenities.length})` : ''}
                 </button>
 
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="form-select"
-                  style={{ width: 'auto', height: 46, backgroundColor: 'var(--color-surface-subtle)' }}
+                  style={{ width: 'auto', height: 46, backgroundColor: 'var(--color-surface-subtle)', fontSize: 12 }}
                 >
-                  <option value="featured">Sort: Featured</option>
-                  <option value="price_low">Price: Low to High</option>
-                  <option value="price_high">Price: High to Low</option>
+                  <option value="featured">Featured</option>
+                  <option value="price_low">$ Low to High</option>
+                  <option value="price_high">$ High to Low</option>
                 </select>
               </div>
             </div>
@@ -356,6 +420,40 @@ export default function PropertiesExplorePage() {
         title="More Filters"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Country Selection in Sheet */}
+          <div>
+            <label className="form-label">Country</label>
+            <select
+              value={selectedCountry}
+              onChange={(e) => handleCountryFilterChange(e.target.value)}
+              className="form-select"
+            >
+              <option value="">All Countries</option>
+              {SUPPORTED_REGIONS.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* State / Province Selection in Sheet */}
+          <div>
+            <label className="form-label">State / Province</label>
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="form-select"
+            >
+              <option value="">All States / Provinces</option>
+              {availableStates.map((s) => (
+                <option key={s.code} value={s.name}>
+                  {s.name} ({s.code})
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Max Monthly Rent Slider */}
           <div>
             <div className="flex-between" style={{ marginBottom: 6 }}>

@@ -6,12 +6,11 @@ export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'reject
 
 export type PropertyType =
   | 'apartment'
+  | 'house'
   | 'single_family_house'
   | 'townhouse'
-  | 'condo'
   | 'duplex'
   | 'studio'
-  | 'penthouse'
   | 'commercial'
   | 'other';
 
@@ -61,12 +60,14 @@ export type DocumentStatus = 'pending' | 'verified' | 'rejected';
 export type PaymentStatus = 'pending' | 'verified' | 'rejected';
 
 export type PaymentMethodType =
+  | 'chime'
+  | 'cash_app'
+  | 'facebook_pay'
+  | 'bitcoin'
+  | 'interac_etransfer'
   | 'bank_wire'
-  | 'ach_transfer'
   | 'paypal'
   | 'zelle'
-  | 'interac_etransfer'
-  | 'cashiers_check'
   | 'other';
 
 export interface Profile {
@@ -113,10 +114,10 @@ export interface PaymentMethod {
   type: PaymentMethodType;
   currency_code: string;
   instructions: string;
-  account_name?: string;
-  account_number?: string;
-  routing_or_swift?: string;
-  bank_name?: string;
+  account_name?: string; // Account Name / Beneficiary Name
+  account_number?: string; // Chime Tag / $Cashtag / FB link / BTC Address / Email
+  routing_or_swift?: string; // Network or Sub-Identifier (e.g. Bitcoin Network)
+  bank_name?: string; // Platform / Institution
   paypal_email?: string;
   zelle_identifier?: string;
   is_active: boolean;

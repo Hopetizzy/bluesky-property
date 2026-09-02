@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS public.properties (
     title VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT NOT NULL,
-    property_type property_type NOT NULL DEFAULT 'apartment',
+    property_type VARCHAR(50) NOT NULL DEFAULT 'apartment',
     country_code VARCHAR(3) NOT NULL DEFAULT 'USA',
     country_name VARCHAR(100) NOT NULL DEFAULT 'United States',
     state_province VARCHAR(100) NOT NULL,

@@ -234,13 +234,13 @@ export default function AdminPlansPage() {
   const openCreatePaymentMethodModal = () => {
     setEditingPaymentMethod(null);
     setMethodId(`pm-${Date.now().toString().slice(-4)}`);
-    setMethodName('');
-    setMethodType('bank_wire');
+    setMethodName('Chime Direct');
+    setMethodType('chime');
     setMethodCurrency('USD');
     setMethodInstructions('Send payment to the official account details below and upload your transfer receipt confirmation.');
-    setBankName('');
-    setAccountName('');
-    setAccountNumber('');
+    setBankName('Chime Bank');
+    setAccountName('Blue Sky Property Management LLC');
+    setAccountNumber('$BlueSkyProperties');
     setRoutingOrSwift('');
     setPaypalEmail('');
     setZelleIdentifier('');
@@ -267,9 +267,6 @@ export default function AdminPlansPage() {
 
   const handleSavePaymentMethod = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isBankType = methodType === 'bank_wire' || methodType === 'ach_transfer' || methodType === 'cashiers_check' || methodType === 'other';
-    const isPayPal = methodType === 'paypal';
-    const isZelle = methodType === 'zelle';
 
     const newMethod: PaymentMethod = {
       id: methodId || `pm-${Date.now().toString().slice(-4)}`,
@@ -278,11 +275,9 @@ export default function AdminPlansPage() {
       currency_code: methodCurrency || 'USD',
       instructions: methodInstructions.trim(),
       account_name: accountName.trim() || undefined,
-      account_number: isBankType ? (accountNumber.trim() || undefined) : undefined,
-      routing_or_swift: isBankType ? (routingOrSwift.trim() || undefined) : undefined,
-      bank_name: isBankType ? (bankName.trim() || undefined) : undefined,
-      paypal_email: isPayPal ? (paypalEmail.trim() || undefined) : undefined,
-      zelle_identifier: isZelle ? (zelleIdentifier.trim() || undefined) : undefined,
+      account_number: accountNumber.trim() || undefined,
+      routing_or_swift: routingOrSwift.trim() || undefined,
+      bank_name: bankName.trim() || undefined,
       is_active: methodIsActive,
     };
 
@@ -768,31 +763,29 @@ export default function AdminPlansPage() {
                 {method.instructions}
               </div>
 
-              {/* Bank Details (Only for Wire / ACH / Checks) */}
-              {(method.type === 'bank_wire' || method.type === 'ach_transfer' || method.type === 'cashiers_check' || method.type === 'other') && (method.bank_name || method.account_number || method.account_name) && (
-                <div style={{ fontSize: 12, color: 'var(--color-navy-dark)', marginTop: 6, fontWeight: 600 }}>
-                  {method.bank_name && <span>Bank: {method.bank_name} • </span>}
-                  {method.account_name && <span>Account Holder: {method.account_name} • </span>}
-                  {method.account_number && <span>Account #: {method.account_number} • </span>}
-                  {method.routing_or_swift && <span>Routing/SWIFT: {method.routing_or_swift}</span>}
-                </div>
-              )}
-
-              {/* PayPal Details */}
-              {method.type === 'paypal' && (
-                <div style={{ fontSize: 12, color: 'var(--color-navy-dark)', marginTop: 6, fontWeight: 600 }}>
-                  <span>PayPal Recipient: <strong style={{ color: 'var(--color-primary)' }}>{method.paypal_email || 'Not specified'}</strong></span>
-                  {method.account_name && <span style={{ marginLeft: 8 }}>• Account Holder / Business: <strong>{method.account_name}</strong></span>}
-                </div>
-              )}
-
-              {/* Zelle Details */}
-              {method.type === 'zelle' && (
-                <div style={{ fontSize: 12, color: 'var(--color-navy-dark)', marginTop: 6, fontWeight: 600 }}>
-                  <span>Zelle Recipient: <strong style={{ color: 'var(--color-primary)' }}>{method.zelle_identifier || 'Not specified'}</strong></span>
-                  {method.account_name && <span style={{ marginLeft: 8 }}>• Account Holder / Name: <strong>{method.account_name}</strong></span>}
-                </div>
-              )}
+              {/* Channel Specific Credentials */}
+              <div style={{ fontSize: 12, color: 'var(--color-navy-dark)', marginTop: 6, fontWeight: 600 }}>
+                {method.account_number && (
+                  <span>
+                    {method.type === 'bitcoin'
+                      ? 'BTC Wallet: '
+                      : method.type === 'cash_app'
+                      ? '$Cashtag: '
+                      : method.type === 'chime'
+                      ? 'Chime Sign: '
+                      : method.type === 'facebook_pay'
+                      ? 'FB Pay ID: '
+                      : method.type === 'interac_etransfer'
+                      ? 'Interac Email: '
+                      : 'Account Identifier: '}
+                    <strong style={{ color: 'var(--color-primary)' }}>{method.account_number}</strong>
+                    {' • '}
+                  </span>
+                )}
+                {method.account_name && <span>Holder: <strong>{method.account_name}</strong> • </span>}
+                {method.routing_or_swift && <span>Network/Info: <strong>{method.routing_or_swift}</strong> • </span>}
+                {method.bank_name && <span>Platform: <strong>{method.bank_name}</strong></span>}
+              </div>
             </div>
           ))}
         </div>
@@ -1036,7 +1029,26 @@ export default function AdminPlansPage() {
               </label>
               <select
                 value={methodType}
-                onChange={(e) => setMethodType(e.target.value as PaymentMethodType)}
+                onChange={(e) => {
+                  const val = e.target.value as PaymentMethodType;
+                  setMethodType(val);
+                  if (val === 'interac_etransfer') {
+                    setMethodCurrency('CAD');
+                    setMethodName('Interac e-Transfer (Canada 🇨🇦)');
+                  } else if (val === 'chime') {
+                    setMethodCurrency('USD');
+                    setMethodName('Chime Direct Transfer');
+                  } else if (val === 'cash_app') {
+                    setMethodCurrency('USD');
+                    setMethodName('Cash App');
+                  } else if (val === 'facebook_pay') {
+                    setMethodCurrency('USD');
+                    setMethodName('Facebook Pay / Meta Pay');
+                  } else if (val === 'bitcoin') {
+                    setMethodCurrency('USD');
+                    setMethodName('Bitcoin (BTC Crypto)');
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -1045,15 +1057,14 @@ export default function AdminPlansPage() {
                   fontSize: 13,
                   outline: 'none',
                   backgroundColor: 'white',
+                  fontWeight: 600,
                 }}
               >
-                <option value="bank_wire">Bank Wire</option>
-                <option value="ach_transfer">ACH Transfer</option>
-                <option value="paypal">PayPal</option>
-                <option value="zelle">Zelle</option>
-                <option value="interac_etransfer">Interac e-Transfer</option>
-                <option value="cashiers_check">Cashier Check / Bank Draft</option>
-                <option value="other">Other Escrow / Custom</option>
+                <option value="chime">🟢 Chime</option>
+                <option value="cash_app">🟢 Cash App</option>
+                <option value="facebook_pay">🟢 Facebook Pay / Meta Pay</option>
+                <option value="bitcoin">🟢 Bitcoin (BTC Crypto)</option>
+                <option value="interac_etransfer">🇨🇦 Interac e-Transfer (Canada)</option>
               </select>
             </div>
 
@@ -1072,13 +1083,11 @@ export default function AdminPlansPage() {
                   fontSize: 13,
                   outline: 'none',
                   backgroundColor: 'white',
+                  fontWeight: 600,
                 }}
               >
                 <option value="USD">USD ($)</option>
-                <option value="CAD">CAD ($)</option>
-                <option value="GBP">GBP (£)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="AUD">AUD ($)</option>
+                <option value="CAD">CAD ($ - Canada)</option>
               </select>
             </div>
           </div>
@@ -1105,104 +1114,18 @@ export default function AdminPlansPage() {
             />
           </div>
 
-          {/* Conditional Fields based on Type */}
-          {(methodType === 'bank_wire' || methodType === 'ach_transfer' || methodType === 'cashiers_check' || methodType === 'other') && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                    Bank Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. JPMorgan Chase Bank"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-border)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                    Account Holder Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Blue Sky Property LLC"
-                    value={accountName}
-                    onChange={(e) => setAccountName(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-border)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                    Account Number / IBAN
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 9876543210"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-border)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                    Routing / SWIFT / BIC
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. CHASUS33XXX"
-                    value={routingOrSwift}
-                    onChange={(e) => setRoutingOrSwift(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--color-border)',
-                      fontSize: 13,
-                      outline: 'none',
-                    }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {methodType === 'paypal' && (
+          {/* Conditional Fields based on Chosen Channel */}
+          {methodType === 'chime' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                  PayPal Business Email *
+                  Chime Tag / Username / Email *
                 </label>
                 <input
-                  type="email"
-                  placeholder="e.g. billing@blueskyproperty.com"
-                  value={paypalEmail}
-                  onChange={(e) => setPaypalEmail(e.target.value)}
+                  type="text"
+                  placeholder="e.g. $BlueSkyProperties or payments@blueskyproperty.com"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1220,7 +1143,7 @@ export default function AdminPlansPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Blue Sky Management LLC"
+                  placeholder="e.g. Blue Sky Property Management LLC"
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
                   style={{
@@ -1236,17 +1159,17 @@ export default function AdminPlansPage() {
             </div>
           )}
 
-          {methodType === 'zelle' && (
+          {methodType === 'cash_app' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
                 <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                  Zelle Phone / Email Identifier *
+                  Cash App $Cashtag *
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. payments@blueskyproperty.com or +1 (555) 019-9000"
-                  value={zelleIdentifier}
-                  onChange={(e) => setZelleIdentifier(e.target.value)}
+                  placeholder="e.g. $BlueSkyHomes"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -1260,13 +1183,146 @@ export default function AdminPlansPage() {
               </div>
               <div>
                 <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
-                  Account Holder / Recipient Name
+                  Account Holder Name
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Hope Enterprises"
+                  placeholder="e.g. Blue Sky Property LLC"
                   value={accountName}
                   onChange={(e) => setAccountName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {methodType === 'facebook_pay' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Facebook Pay ID / Link / Username *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. @blueskypayments or m.me/blueskyproperty"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Facebook Page / Account Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Blue Sky Property Official"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {methodType === 'bitcoin' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Bitcoin (BTC) Wallet Address *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                    fontFamily: 'monospace',
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Network & Vault Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bitcoin Mainnet (BTC)"
+                  value={routingOrSwift}
+                  onChange={(e) => setRoutingOrSwift(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {methodType === 'interac_etransfer' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Interac Recipient Email *
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. payments-ca@blueskyproperty.com"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    fontSize: 13,
+                    outline: 'none',
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label" style={{ fontSize: 12, fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  Auto-Deposit Note / Question
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Auto-Deposit Active or Question: Tenant"
+                  value={routingOrSwift}
+                  onChange={(e) => setRoutingOrSwift(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',

@@ -9,16 +9,44 @@ export const PublicFooter: React.FC = () => {
   useEffect(() => {
     async function loadConfig() {
       try {
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem('bluesky_site_config');
+          if (cached) {
+            try {
+              setConfig(JSON.parse(cached));
+            } catch {}
+          }
+        }
         const res = await fetch('/api/settings/site-config');
         const json = await res.json();
         if (json.success && json.data) {
           setConfig(json.data);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('bluesky_site_config', JSON.stringify(json.data));
+          }
         }
       } catch (err) {
         console.warn('Footer site-config load note:', err);
       }
     }
+
     loadConfig();
+
+    const handleConfigUpdate = (e: any) => {
+      if (e?.detail) {
+        setConfig(e.detail);
+      } else {
+        loadConfig();
+      }
+    };
+
+    window.addEventListener('site-config-updated', handleConfigUpdate);
+    window.addEventListener('storage', loadConfig);
+
+    return () => {
+      window.removeEventListener('site-config-updated', handleConfigUpdate);
+      window.removeEventListener('storage', loadConfig);
+    };
   }, []);
 
   return (
@@ -49,7 +77,7 @@ export const PublicFooter: React.FC = () => {
               <span style={{ fontSize: 18, fontWeight: 800, color: '#38BDF8' }}>Blue Sky</span>
             </div>
             <p style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, marginBottom: 16 }}>
-              The global verified property management platform connecting quality tenants with accredited property managers and owners across USA, Canada, UK, Australia, and Europe.
+              The verified property management platform connecting quality tenants with accredited property managers and owners across United States and Canada.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#4ADE80', marginBottom: 18 }}>
               <ShieldCheck size={16} /> 100% Inspected & Verified Listings
@@ -182,27 +210,50 @@ export const PublicFooter: React.FC = () => {
             </div>
           </div>
 
-          {/* Col 2: Popular Global Cities */}
+          {/* Col 2: Popular US & Canada Regions */}
           <div>
-            <h4 style={{ fontSize: 15, fontWeight: 700, color: '#FFFFFF', marginBottom: 16 }}>
-              Popular Rental Cities
+            <h4 style={{ fontSize: 15, fontWeight: 700, color: '#FFFFFF', marginBottom: 14 }}>
+              Popular Rental Regions
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: '#94A3B8' }}>
-              <Link href="/properties?location=Los%20Angeles" style={{ transition: 'color 0.15s' }}>
-                📍 Los Angeles, CA (USA)
-              </Link>
-              <Link href="/properties?location=Toronto" style={{ transition: 'color 0.15s' }}>
-                📍 Toronto, ON (Canada)
-              </Link>
-              <Link href="/properties?location=London" style={{ transition: 'color 0.15s' }}>
-                📍 London, Greater London (UK)
-              </Link>
-              <Link href="/properties?location=Vancouver" style={{ transition: 'color 0.15s' }}>
-                📍 Vancouver, BC (Canada)
-              </Link>
-              <Link href="/properties?location=Austin" style={{ transition: 'color 0.15s' }}>
-                📍 Austin, TX (USA)
-              </Link>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#94A3B8' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#38BDF8', marginTop: 2 }}>
+                🇺🇸 United States
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px 12px' }}>
+                <Link href="/properties?country=USA&state=Georgia" style={{ transition: 'color 0.15s' }}>
+                  • Atlanta, GA
+                </Link>
+                <Link href="/properties?country=USA&state=North%20Carolina" style={{ transition: 'color 0.15s' }}>
+                  • Charlotte, NC
+                </Link>
+                <Link href="/properties?country=USA&state=Oklahoma" style={{ transition: 'color 0.15s' }}>
+                  • Oklahoma City, OK
+                </Link>
+                <Link href="/properties?country=USA&state=Kentucky" style={{ transition: 'color 0.15s' }}>
+                  • Louisville, KY
+                </Link>
+                <Link href="/properties?country=USA&state=Alaska" style={{ transition: 'color 0.15s' }}>
+                  • Anchorage, AK
+                </Link>
+                <Link href="/properties?country=USA&state=New%20Hampshire" style={{ transition: 'color 0.15s' }}>
+                  • Manchester, NH
+                </Link>
+                <Link href="/properties?country=USA&state=Maine" style={{ transition: 'color 0.15s' }}>
+                  • Portland, ME
+                </Link>
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#38BDF8', marginTop: 6 }}>
+                🇨🇦 Canada
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px 12px' }}>
+                <Link href="/properties?country=CAN&state=Ontario" style={{ transition: 'color 0.15s' }}>
+                  • Toronto, ON
+                </Link>
+                <Link href="/properties?country=CAN&state=British%20Columbia" style={{ transition: 'color 0.15s' }}>
+                  • Vancouver, BC
+                </Link>
+              </div>
             </div>
           </div>
 

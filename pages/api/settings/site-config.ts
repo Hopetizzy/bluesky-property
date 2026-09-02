@@ -15,7 +15,7 @@ export interface SiteConfigSettings {
 export const DEFAULT_SITE_CONFIG: SiteConfigSettings = {
   support_email: 'support@blueskyproperty.com',
   support_phone: '+1 (800) 555-0199',
-  office_address: '9454 Wilshire Blvd, Suite 600, Beverly Hills, CA 90212',
+  office_address: '950 Peachtree St NE, Suite 800, Atlanta, GA 30309',
   facebook_url: 'https://facebook.com/blueskyproperty',
   twitter_url: 'https://twitter.com/blueskyprop',
   instagram_url: 'https://instagram.com/blueskyproperty',

@@ -173,7 +173,7 @@ Congratulations! We are delighted to inform you that your rental application (Re
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • Property: ${app.property_title}
 • Unit / Residence: ${app.unit_name || 'Main Residence'}
-• Address: ${app.property_address || 'Wilshire Blvd, Los Angeles'}
+• Address: ${app.property_address || 'Peachtree St NE, Atlanta, GA'}
 • Monthly Rent: $${(app.unit_rent || 2500).toLocaleString()} ${app.unit_currency || 'USD'}/month
 • Requested Move-In Date: ${app.desired_move_in || 'Immediate'}
 • Lease Term: ${app.lease_term_months || 12} Months

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -9,24 +9,32 @@ import {
   Headphones,
   Award,
   ChevronRight,
+  ChevronDown,
   Building2,
   CheckCircle2,
   ArrowRight,
   UserCheck,
   Calendar,
+  Globe2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { PropertyCard } from '@/components/property/PropertyCard';
 import { propertiesDb } from '@/lib/db';
 import { Property } from '@/lib/types';
+import { SUPPORTED_REGIONS, getStatesForCountry, SupportedCountry } from '@/lib/constants';
 
 export default function HomePage() {
   const router = useRouter();
   const [properties, setProperties] = useState<Property[]>([]);
-  const [searchLocation, setSearchLocation] = useState('');
-  const [propertyType, setPropertyType] = useState('all');
-  const [rentPeriod, setRentPeriod] = useState('monthly');
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [searchLocation, setSearchLocation] = useState<string>('');
+  const [propertyType, setPropertyType] = useState<string>('all');
+  const [rentPeriod, setRentPeriod] = useState<string>('monthly');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeCountryPopover, setActiveCountryPopover] = useState<string | null>(null);
+
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -36,34 +44,57 @@ export default function HomePage() {
     loadData();
   }, []);
 
+  // Handle outside click for country popovers
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setActiveCountryPopover(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleCountryChange = (countryCode: string) => {
+    setSelectedCountry(countryCode);
+    setSelectedState(''); // reset state when country changes
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     router.push({
       pathname: '/properties',
       query: {
+        country: selectedCountry || undefined,
+        state: selectedState || undefined,
         location: searchLocation || undefined,
         type: propertyType !== 'all' ? propertyType : undefined,
       },
     });
   };
 
-  const popularLocations = [
-    { name: 'Los Angeles', country: 'United States', flag: '🇺🇸' },
-    { name: 'Toronto', country: 'Canada', flag: '🇨🇦' },
-    { name: 'London', country: 'United Kingdom', flag: '🇬🇧' },
-    { name: 'Vancouver', country: 'Canada', flag: '🇨🇦' },
-    { name: 'Austin', country: 'United States', flag: '🇺🇸' },
-    { name: 'New York', country: 'United States', flag: '🇺🇸' },
-  ];
+  const handleQuickSelectState = (countryCode: string, stateName: string) => {
+    setActiveCountryPopover(null);
+    setSelectedCountry(countryCode);
+    setSelectedState(stateName);
+    router.push({
+      pathname: '/properties',
+      query: {
+        country: countryCode,
+        state: stateName,
+      },
+    });
+  };
+
+  const availableStates = getStatesForCountry(selectedCountry);
 
   const categories = [
     { id: 'all', label: 'All Properties' },
     { id: 'apartment', label: 'Apartments' },
-    { id: 'studio', label: 'Studios' },
+    { id: 'house', label: 'Houses' },
     { id: 'townhouse', label: 'Townhouses' },
-    { id: 'condo', label: 'Condos' },
-    { id: 'penthouse', label: 'Penthouses' },
     { id: 'duplex', label: 'Duplexes' },
+    { id: 'studio', label: 'Studios' },
   ];
 
   const filteredProperties =
@@ -83,6 +114,8 @@ export default function HomePage() {
         className="animate-fade-in"
         style={{
           position: 'relative',
+          zIndex: 50,
+          overflow: 'visible',
           padding: '70px 0 90px 0',
           backgroundImage:
             'linear-gradient(135deg, rgba(0, 102, 255, 0.90) 0%, rgba(15, 23, 42, 0.82) 50%, rgba(15, 23, 42, 0.45) 100%), url(https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1920&q=85)',
@@ -91,7 +124,7 @@ export default function HomePage() {
           color: '#FFFFFF',
         }}
       >
-        <div className="page-container" style={{ position: 'relative', zIndex: 10 }}>
+        <div className="page-container" style={{ position: 'relative', zIndex: 50, overflow: 'visible' }}>
           <div className="animate-fade-in-up" style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center', marginBottom: 36 }}>
             <h1
               style={{
@@ -117,7 +150,7 @@ export default function HomePage() {
                 fontWeight: 400,
               }}
             >
-              Verified properties. Transparent process. Peace of mind.
+              Verified properties across United States & Canada. Transparent process. Peace of mind.
             </p>
           </div>
 
@@ -125,27 +158,74 @@ export default function HomePage() {
           <div
             className="animate-fade-in-up"
             style={{
-              maxWidth: 900,
+              maxWidth: 960,
               margin: '0 auto',
               backgroundColor: 'var(--color-white)',
               borderRadius: 'var(--radius-xl)',
               padding: '24px',
               boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
               color: 'var(--color-navy-dark)',
+              position: 'relative',
+              zIndex: 60,
+              overflow: 'visible',
             }}
           >
             <form onSubmit={handleSearch}>
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: 14,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 12,
                   marginBottom: 16,
                 }}
               >
-                {/* Location */}
+                {/* 1. Country Selector */}
                 <div>
-                  <label className="form-label">Search Location</label>
+                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+                    Country
+                  </label>
+                  <select
+                    value={selectedCountry}
+                    onChange={(e) => handleCountryChange(e.target.value)}
+                    className="form-select"
+                    style={{ height: 48, backgroundColor: 'var(--color-surface-subtle)', fontWeight: 600 }}
+                  >
+                    <option value="">All Countries (USA & CAN)</option>
+                    {SUPPORTED_REGIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. State / Province Selector */}
+                <div>
+                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+                    State / Province
+                  </label>
+                  <select
+                    value={selectedState}
+                    onChange={(e) => setSelectedState(e.target.value)}
+                    className="form-select"
+                    style={{ height: 48, backgroundColor: 'var(--color-surface-subtle)', fontWeight: 600 }}
+                  >
+                    <option value="">
+                      {selectedCountry ? 'All States / Provinces' : 'Select a Country first'}
+                    </option>
+                    {availableStates.map((s) => (
+                      <option key={s.code} value={s.name}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Search City / Keyword */}
+                <div>
+                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+                    City or Keyword
+                  </label>
                   <div style={{ position: 'relative' }}>
                     <MapPin
                       size={18}
@@ -159,7 +239,7 @@ export default function HomePage() {
                     />
                     <input
                       type="text"
-                      placeholder="City, area, or address..."
+                      placeholder="e.g. Atlanta, Toronto, Charlotte..."
                       value={searchLocation}
                       onChange={(e) => setSearchLocation(e.target.value)}
                       className="form-input"
@@ -168,9 +248,11 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Property Type */}
+                {/* 4. Property Type */}
                 <div>
-                  <label className="form-label">Property Type</label>
+                  <label className="form-label" style={{ fontSize: 12, fontWeight: 700 }}>
+                    Property Type
+                  </label>
                   <select
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value)}
@@ -179,75 +261,178 @@ export default function HomePage() {
                   >
                     <option value="all">All Types</option>
                     <option value="apartment">Apartments</option>
-                    <option value="studio">Studios</option>
+                    <option value="house">Houses</option>
                     <option value="townhouse">Townhouses</option>
-                    <option value="condo">Condos</option>
-                    <option value="penthouse">Penthouses</option>
                     <option value="duplex">Duplexes</option>
+                    <option value="studio">Studios</option>
                   </select>
                 </div>
 
-                {/* Rent Period */}
-                <div>
-                  <label className="form-label">Rent Period</label>
-                  <select
-                    value={rentPeriod}
-                    onChange={(e) => setRentPeriod(e.target.value)}
-                    className="form-select"
-                    style={{ height: 48, backgroundColor: 'var(--color-surface-subtle)' }}
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="annual">Annual Lease</option>
-                  </select>
-                </div>
-
-                {/* Search Button */}
+                {/* 5. Search Button */}
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                   <button
                     type="submit"
                     className="btn btn-primary btn-lg"
-                    style={{ width: '100%', height: 48 }}
+                    style={{ width: '100%', height: 48, fontWeight: 700 }}
                   >
-                    <Search size={18} /> Search Properties
+                    <Search size={18} /> Search
                   </button>
                 </div>
               </div>
 
-              {/* Popular City Shortcuts */}
+              {/* Interactive Quick-Select Country & State Popovers */}
               <div
+                ref={popoverRef}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  gap: 12,
                   flexWrap: 'wrap',
                   borderTop: '1px solid var(--color-border)',
-                  paddingTop: 12,
-                  fontSize: 12,
-                  color: 'var(--color-text-secondary)',
+                  paddingTop: 14,
+                  fontSize: 13,
+                  position: 'relative',
+                  zIndex: 70,
                 }}
               >
-                <span style={{ fontWeight: 700, color: 'var(--color-navy-dark)' }}>Popular:</span>
-                {['Los Angeles', 'Toronto', 'London', 'Vancouver', 'Austin'].map((city) => (
-                  <button
-                    key={city}
-                    type="button"
-                    onClick={() => {
-                      setSearchLocation(city);
-                      router.push(`/properties?location=${encodeURIComponent(city)}`);
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-primary)',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                    }}
-                  >
-                    {city}
-                  </button>
-                ))}
+                <span style={{ fontWeight: 700, color: 'var(--color-navy-dark)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Globe2 size={14} color="var(--color-primary)" />
+                  Explore by Country & State:
+                </span>
+
+                {SUPPORTED_REGIONS.map((country) => {
+                  const isOpen = activeCountryPopover === country.code;
+                  return (
+                    <div key={country.code} style={{ position: 'relative', zIndex: 80 }}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveCountryPopover(isOpen ? null : country.code)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 14px',
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: isOpen ? 'var(--color-primary)' : 'var(--color-surface-subtle)',
+                          color: isOpen ? '#FFFFFF' : 'var(--color-navy-dark)',
+                          border: isOpen ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isOpen ? '0 4px 12px rgba(0, 102, 255, 0.25)' : 'none',
+                        }}
+                      >
+                        <span style={{ fontSize: 16 }}>{country.flag}</span>
+                        <span>{country.name}</span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            backgroundColor: isOpen ? 'rgba(255,255,255,0.25)' : 'var(--color-border)',
+                            color: isOpen ? '#FFFFFF' : 'var(--color-text-secondary)',
+                            padding: '1px 6px',
+                            borderRadius: 10,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {country.states.length} States
+                        </span>
+                        <ChevronDown
+                          size={14}
+                          style={{
+                            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                            transition: 'transform 0.2s ease',
+                          }}
+                        />
+                      </button>
+
+                      {/* Dropdown Menu Popover */}
+                      {isOpen && (
+                        <div
+                          className="animate-fade-in-up"
+                          style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 8px)',
+                            left: 0,
+                            zIndex: 9999,
+                            width: 300,
+                            backgroundColor: 'var(--color-white)',
+                            borderRadius: 'var(--radius-lg)',
+                            boxShadow: '0 20px 40px rgba(15, 23, 42, 0.35)',
+                            border: '1px solid var(--color-border)',
+                            padding: '12px',
+                            display: 'grid',
+                            gap: 4,
+                          }}
+                        >
+                          <div
+                            style={{
+                              padding: '6px 8px',
+                              fontSize: 11,
+                              fontWeight: 800,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              color: 'var(--color-primary)',
+                              borderBottom: '1px solid var(--color-border)',
+                              marginBottom: 4,
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <span>{country.flag} {country.name} Regions</span>
+                            <span style={{ fontSize: 10, color: 'var(--color-text-secondary)' }}>Click to view</span>
+                          </div>
+
+                          <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                            {country.states.map((st) => (
+                              <button
+                                key={st.code}
+                                type="button"
+                                onClick={() => handleQuickSelectState(country.code, st.name)}
+                                style={{
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '9px 10px',
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: 'var(--color-navy-dark)',
+                                  transition: 'background-color 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-tint)')}
+                                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <MapPin size={13} color="var(--color-primary)" />
+                                  <span>{st.name}</span>
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: 'var(--color-text-secondary)',
+                                    backgroundColor: 'var(--color-surface-subtle)',
+                                    padding: '2px 6px',
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  {st.code}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </form>
           </div>
@@ -257,7 +442,7 @@ export default function HomePage() {
       {/* =========================================================================
           FEATURED RENTALS & CATEGORIES (Fetched Directly from Database)
           ========================================================================= */}
-      <section style={{ padding: '60px 0' }} className="animate-fade-in">
+      <section style={{ padding: '60px 0', position: 'relative', zIndex: 1 }} className="animate-fade-in">
         <div className="page-container">
           <div className="flex-between" style={{ alignItems: 'flex-end', marginBottom: 24 }}>
             <div>
@@ -606,47 +791,62 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================================
-          POPULAR CITIES SHOWCASE
+          EXPLORE PROPERTIES BY REGION & STATE (USA & CANADA)
           ========================================================================= */}
       <section style={{ padding: '60px 0', backgroundColor: 'var(--color-white)' }}>
         <div className="page-container">
-          <div style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto 36px auto' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
-              Worldwide Metropolises
+          <div style={{ textAlign: 'center', maxWidth: 680, margin: '0 auto 36px auto' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Supported Jurisdictions
             </span>
-            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, marginTop: 4 }}>
-              Explore Properties by City
+            <h2 style={{ fontSize: 'clamp(22px, 3vw, 32px)', fontWeight: 800, marginTop: 4, color: 'var(--color-navy-dark)' }}>
+              Explore Properties by State & Province
             </h2>
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 6 }}>
+              Browse verified residential rentals across 7 US States and 2 Canadian Provinces
+            </p>
           </div>
 
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
               gap: 16,
             }}
           >
-            {popularLocations.map((loc) => (
+            {SUPPORTED_REGIONS.flatMap((c) =>
+              c.states.map((st) => ({
+                countryName: c.name,
+                countryCode: c.code,
+                flag: c.flag,
+                stateName: st.name,
+                stateCode: st.code,
+                cities: st.majorCities.slice(0, 2).join(', '),
+              }))
+            ).map((loc) => (
               <div
-                key={loc.name}
-                onClick={() => router.push(`/properties?location=${encodeURIComponent(loc.name)}`)}
+                key={`${loc.countryCode}-${loc.stateCode}`}
+                onClick={() => router.push(`/properties?country=${loc.countryCode}&state=${encodeURIComponent(loc.stateName)}`)}
                 className="card card-clickable"
                 style={{
-                  padding: 16,
+                  padding: '16px 20px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  borderRadius: 'var(--radius-lg)',
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-surface-subtle)',
+                  transition: 'all 0.2s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                   <span style={{ fontSize: 26 }}>{loc.flag}</span>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
-                      {loc.name}
+                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
+                      {loc.stateName} ({loc.stateCode})
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                      {loc.country}
+                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                      {loc.countryName} • <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{loc.cities}</span>
                     </div>
                   </div>
                 </div>

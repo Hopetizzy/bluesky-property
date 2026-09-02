@@ -27,6 +27,7 @@ import { store } from '@/lib/store';
 import { propertiesDb } from '@/lib/db/properties';
 import { listingPlansDb } from '@/lib/db/listingPlans';
 import { Property, PropertyUnit, PropertyType, ProviderListingPeriod, ProviderProfile } from '@/lib/types';
+import { SUPPORTED_REGIONS, getStatesForCountry } from '@/lib/constants';
 
 export default function AddPropertyPage() {
   const router = useRouter();
@@ -548,12 +549,10 @@ export default function AddPropertyPage() {
                 className="form-select"
               >
                 <option value="apartment">Apartment / Flat</option>
-                <option value="single_family_house">Single Family Detached House</option>
-                <option value="condo">Condominium</option>
+                <option value="house">House / Single Family Detached</option>
                 <option value="townhouse">Townhouse / Rowhouse</option>
-                <option value="studio">Studio Apartment</option>
                 <option value="duplex">Duplex / Multi-Family</option>
-                <option value="penthouse">Luxury Penthouse</option>
+                <option value="studio">Studio Apartment</option>
                 <option value="commercial">Commercial Space</option>
                 <option value="other">Other Residential</option>
               </select>
@@ -590,29 +589,40 @@ export default function AddPropertyPage() {
               </label>
               <select
                 value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
+                onChange={(e) => {
+                  setCountryCode(e.target.value);
+                  setStateProvince('');
+                }}
                 className="form-select"
+                style={{ fontWeight: 600 }}
               >
-                <option value="USA">🇺🇸 United States</option>
-                <option value="CAN">🇨🇦 Canada</option>
-                <option value="GBR">🇬🇧 United Kingdom</option>
-                <option value="AUS">🇦🇺 Australia</option>
-                <option value="EUR">🇪🇺 Europe / International</option>
+                {SUPPORTED_REGIONS.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.flag} {c.name} ({c.currency})
+                  </option>
+                ))}
               </select>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 700 }}>
-                  State / Province / Region
+                  State / Province <span style={{ color: 'var(--color-danger)' }}>*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={stateProvince}
                   onChange={(e) => setStateProvince(e.target.value)}
-                  className="form-input"
-                  placeholder="e.g. California / Ontario / London"
-                />
+                  className="form-select"
+                  required
+                  style={{ fontWeight: 600 }}
+                >
+                  <option value="">Select State / Province</option>
+                  {getStatesForCountry(countryCode).map((s) => (
+                    <option key={s.code} value={s.name}>
+                      {s.name} ({s.code})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
@@ -624,7 +634,7 @@ export default function AddPropertyPage() {
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   className="form-input"
-                  placeholder="e.g. Los Angeles / Toronto / Sydney"
+                  placeholder="e.g. Atlanta / Charlotte / Toronto"
                   required
                 />
               </div>

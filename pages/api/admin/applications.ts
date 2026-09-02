@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           property_id: row.property_id,
           property_title: prop?.title || 'Luxury Property Listing',
           property_image: propImage,
-          property_address: prop?.street_address || (prop ? `${prop.city}, ${prop.state_province}` : 'Wilshire Blvd, Los Angeles'),
+          property_address: prop?.street_address || (prop ? `${prop.city}, ${prop.state_province}` : 'Peachtree St NE, Atlanta'),
           unit_id: row.unit_id,
           unit_name: unit?.unit_number_or_name || 'Main Residence',
           unit_rent: unit?.rent_amount ? Number(unit.rent_amount) : 2500,

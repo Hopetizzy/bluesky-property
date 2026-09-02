@@ -27,12 +27,13 @@ INSERT INTO public.listing_plans (id, name, description, price, currency_code, d
     ('b0000001-0000-0000-0000-000000000365', '365 Days Annual Platinum Access', 'Maximum value with full annual coverage and premium placement.', 349.00, 'USD', 365, FALSE, TRUE, '["Unlimited property listings", "Instant priority verification", "Top tier search prominence", "Dedicated account manager", "Active for 365 days"]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Payment Methods (External Proof Verification)
-INSERT INTO public.payment_methods (id, name, type, currency_code, instructions, account_name, account_number, routing_or_swift, bank_name, paypal_email, zelle_identifier, is_active) VALUES
-    ('c0000001-0000-0000-0000-000000000001', 'Bank Wire / ACH Transfer', 'bank_wire', 'USD', 'Send wire or ACH payment to official Blue Sky Property Management escrow account. Upload receipt screenshot or PDF below.', 'BLUE SKY PROPERTY MANAGEMENT LLC', '9876543210', 'CHASUS33XXX / 122000496', 'JPMorgan Chase Bank, N.A.', NULL, NULL, TRUE),
-    ('c0000001-0000-0000-0000-000000000002', 'PayPal Transfer', 'paypal', 'USD', 'Send payment via PayPal to payments@blueskyproperty.com. Please include your registered Provider Email in the payment note.', NULL, NULL, NULL, NULL, 'payments@blueskyproperty.com', NULL, TRUE),
-    ('c0000001-0000-0000-0000-000000000003', 'Zelle Instant Payment', 'zelle', 'USD', 'Send instant payment via Zelle to billing@blueskyproperty.com. Enter your full company or personal name in the memo.', NULL, NULL, NULL, NULL, NULL, 'billing@blueskyproperty.com', TRUE),
-    ('c0000001-0000-0000-0000-000000000004', 'Interac e-Transfer (Canada)', 'interac_etransfer', 'CAD', 'Send Interac e-Transfer to payments-ca@blueskyproperty.com with auto-deposit enabled.', NULL, NULL, NULL, 'Royal Bank of Canada (RBC)', NULL, 'payments-ca@blueskyproperty.com', TRUE)
+-- 3. Payment Methods (Strictly 5 Formats: Chime, Cash App, Facebook Pay, Bitcoin, Interac E-Transfer Canada)
+INSERT INTO public.payment_methods (id, name, type, currency_code, instructions, account_name, account_number, routing_or_swift, bank_name, is_active) VALUES
+    ('c0000001-0000-0000-0000-000000000001', 'Chime Direct Transfer', 'chime', 'USD', 'Send transfer via Chime to $BlueSkyProperties or payments@blueskyproperty.com. Please include your provider business name in the memo.', 'Blue Sky Property Management LLC', '$BlueSkyProperties', NULL, 'Chime Bank (Bancorp / Stride)', TRUE),
+    ('c0000001-0000-0000-0000-000000000002', 'Cash App', 'cash_app', 'USD', 'Send payment to official $Cashtag: $BlueSkyHomes. Include your property name or provider email in the note.', 'Blue Sky Property LLC', '$BlueSkyHomes', NULL, 'Cash App / Block Inc.', TRUE),
+    ('c0000001-0000-0000-0000-000000000003', 'Facebook Pay / Meta Pay', 'facebook_pay', 'USD', 'Send payment through Facebook Messenger / Meta Pay to @blueskypayments. Mention your listing plan ID in the message.', 'Blue Sky Property Official', '@blueskypayments', NULL, 'Meta / Facebook Pay', TRUE),
+    ('c0000001-0000-0000-0000-000000000004', 'Bitcoin (BTC Crypto)', 'bitcoin', 'USD', 'Send exact USD equivalent in BTC to the corporate cold-storage Bitcoin address. Upload the transaction hash or confirmation screenshot.', 'Blue Sky Corporate Vault', 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', 'Bitcoin (BTC) Native SegWit', 'Bitcoin Blockchain Network', TRUE),
+    ('c0000001-0000-0000-0000-000000000005', 'Interac e-Transfer (Canada 🇨🇦)', 'interac_etransfer', 'CAD', 'Send Interac e-Transfer to payments-ca@blueskyproperty.com with Auto-Deposit enabled. No password required.', 'Blue Sky Properties Canada Inc.', 'payments-ca@blueskyproperty.com', 'Auto-Deposit Enabled', 'Interac / Canadian Financial Institutions', TRUE)
 ON CONFLICT (id) DO NOTHING;
 
 -- 4. Demo Profiles (Admin, Providers, Applicants)
@@ -63,31 +64,31 @@ INSERT INTO public.provider_listing_periods (id, provider_id, listing_plan_id, p
     ('10000001-0000-0000-0000-000000000002', 'e0000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000180', 'f0000001-0000-0000-0000-000000000002', NOW() - INTERVAL '5 days', NOW() + INTERVAL '175 days', 48, 'active')
 ON CONFLICT (id) DO NOTHING;
 
--- 7. Worldwide Properties
--- Prop 1: Los Angeles Apartment
+-- 7. Worldwide Properties (USA & Canada Supported Regions)
+-- Prop 1: Atlanta Apartment
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured, published_at) VALUES
-    ('20000001-0000-0000-0000-000000000001', 'e0000001-0000-0000-0000-000000000001', FALSE, '2 Bedroom Modern Apartment', '2-bedroom-modern-apartment-los-angeles', 'Spacious 2 bedroom luxury apartment in a prime location. Features floor-to-ceiling windows, open-concept kitchen, in-unit laundry, smart thermostat, and resort-style amenities.', 'apartment', 'USA', 'United States', 'California', 'Los Angeles', 'Downtown / South Park', '888 S Olive Street', '90014', 'approved', TRUE, NOW() - INTERVAL '6 days')
+    ('20000001-0000-0000-0000-000000000001', 'e0000001-0000-0000-0000-000000000001', FALSE, '2 Bedroom Modern Apartment', '2-bedroom-modern-apartment-atlanta-ga', 'Spacious 2 bedroom luxury apartment in a prime location. Features floor-to-ceiling windows, open-concept kitchen, in-unit laundry, smart thermostat, and resort-style amenities.', 'apartment', 'USA', 'United States', 'Georgia', 'Atlanta', 'Midtown / Buckhead', '950 Peachtree St NE', '30309', 'approved', TRUE, NOW() - INTERVAL '6 days')
 ON CONFLICT (id) DO NOTHING;
 
 -- Prop 2: Toronto Admin Direct Studio
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured, published_at) VALUES
-    ('20000001-0000-0000-0000-000000000002', NULL, TRUE, 'Luxury Studio Apartment', 'luxury-studio-apartment-toronto', 'Chic downtown studio apartment steps away from transit, fine dining, and entertainment. Includes high-speed fiber internet, quartz countertops, designer lighting, and access to rooftop lounge.', 'studio', 'CAN', 'Canada', 'Ontario', 'Toronto', 'Entertainment District', '290 Adelaide St W', 'M5V 1P6', 'approved', TRUE, NOW() - INTERVAL '9 days')
+    ('20000001-0000-0000-0000-000000000002', NULL, TRUE, 'Luxury Studio Apartment', 'luxury-studio-apartment-toronto-on', 'Chic downtown studio apartment steps away from transit, fine dining, and entertainment. Includes high-speed fiber internet, quartz countertops, designer lighting, and access to rooftop lounge.', 'studio', 'CAN', 'Canada', 'Ontario', 'Toronto', 'Entertainment District', '290 Adelaide St W', 'M5V 1P6', 'approved', TRUE, NOW() - INTERVAL '9 days')
 ON CONFLICT (id) DO NOTHING;
 
--- Prop 3: London Victorian Townhouse
+-- Prop 3: Louisville Victorian Townhouse
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured, published_at) VALUES
-    ('20000001-0000-0000-0000-000000000003', 'e0000001-0000-0000-0000-000000000002', FALSE, '3 Bedroom Victorian Townhouse', '3-bedroom-victorian-townhouse-london', 'Elegant three-bedroom Victorian home located in a quiet tree-lined street in Kensington. High ceilings, original fireplaces, private rear garden, and newly renovated chef kitchen.', 'townhouse', 'GBR', 'United Kingdom', 'Greater London', 'London', 'Kensington', '14 Holland Park Gardens', 'W14 8DY', 'approved', TRUE, NOW() - INTERVAL '5 days')
+    ('20000001-0000-0000-0000-000000000003', 'e0000001-0000-0000-0000-000000000002', FALSE, '3 Bedroom Victorian Townhouse', '3-bedroom-victorian-townhouse-louisville-ky', 'Elegant three-bedroom Victorian home located in a quiet tree-lined street in Old Louisville. High ceilings, original fireplaces, private rear garden, and newly renovated chef kitchen.', 'townhouse', 'USA', 'United States', 'Kentucky', 'Louisville', 'Old Louisville', '1412 S 4th Street', '40208', 'approved', TRUE, NOW() - INTERVAL '5 days')
 ON CONFLICT (id) DO NOTHING;
 
--- Prop 4: Vancouver Waterfront Condo
+-- Prop 4: Vancouver Waterfront Apartment
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured, published_at) VALUES
-    ('20000001-0000-0000-0000-000000000004', 'e0000001-0000-0000-0000-000000000001', FALSE, '1 Bedroom Waterfront Condo', '1-bedroom-waterfront-condo-vancouver', 'Stunning water and mountain views from this contemporary 1-bedroom condo in Coal Harbour. Includes dedicated parking space, storage locker, and bicycle room.', 'condo', 'CAN', 'Canada', 'British Columbia', 'Vancouver', 'Coal Harbour', '1288 W Georgia St', 'V6E 4R5', 'approved', FALSE, NOW() - INTERVAL '3 days')
+    ('20000001-0000-0000-0000-000000000004', 'e0000001-0000-0000-0000-000000000001', FALSE, '1 Bedroom Waterfront Apartment', '1-bedroom-waterfront-apartment-vancouver-bc', 'Stunning water and mountain views from this contemporary 1-bedroom apartment in Coal Harbour. Includes dedicated parking space, storage locker, and bicycle room.', 'apartment', 'CAN', 'Canada', 'British Columbia', 'Vancouver', 'Coal Harbour', '1288 W Georgia St', 'V6E 4R5', 'approved', FALSE, NOW() - INTERVAL '3 days')
 ON CONFLICT (id) DO NOTHING;
 
--- Prop 5: Austin Duplex (Pending Verification)
+-- Prop 5: Charlotte Duplex (Pending Verification)
 INSERT INTO public.properties (id, provider_id, is_admin_direct, title, slug, description, property_type, country_code, country_name, state_province, city, neighborhood, street_address, postal_code, status, featured) VALUES
-    ('20000001-0000-0000-0000-000000000005', 'e0000001-0000-0000-0000-000000000003', FALSE, '2 Bedroom Modern Duplex', '2-bedroom-modern-duplex-austin', 'Newly constructed Austin duplex with fenced yard, EV charging, polished concrete floors, and smart home automation.', 'duplex', 'USA', 'United States', 'Texas', 'Austin', 'South Congress', '1904 S Congress Ave', '78704', 'pending_verification', FALSE),
-    ('20000001-0000-0000-0000-000000000006', 'e0000001-0000-0000-0000-000000000002', FALSE, 'Luxury Sydney Harbour Penthouse', 'luxury-sydney-harbour-penthouse', 'Prestigious waterfront penthouse in Circular Quay with uninterrupted Sydney Harbour and Opera House views.', 'penthouse', 'AUS', 'Australia', 'New South Wales', 'Sydney', 'Circular Quay / CBD', '1 Macquarie Street', '2000', 'pending_verification', FALSE)
+    ('20000001-0000-0000-0000-000000000005', 'e0000001-0000-0000-0000-000000000003', FALSE, '2 Bedroom Modern Duplex', '2-bedroom-modern-duplex-charlotte-nc', 'Newly constructed Charlotte duplex with fenced yard, EV charging, polished concrete floors, and smart home automation in vibrant South End.', 'duplex', 'USA', 'United States', 'North Carolina', 'Charlotte', 'South End / Uptown', '1904 South Blvd', '28203', 'pending_verification', FALSE),
+    ('20000001-0000-0000-0000-000000000006', 'e0000001-0000-0000-0000-000000000002', FALSE, 'Luxury Mountain View Executive House', 'luxury-mountain-view-executive-house-anchorage-ak', 'Prestigious executive residence in Downtown Anchorage with uninterrupted Chugach mountain and Cook Inlet views.', 'house', 'USA', 'United States', 'Alaska', 'Anchorage', 'Downtown / Inlet View', '450 W 5th Avenue', '99501', 'pending_verification', FALSE)
 ON CONFLICT (id) DO NOTHING;
 
 -- 8. Property Units (Multi-Unit Configurations)
@@ -95,10 +96,10 @@ INSERT INTO public.property_units (id, property_id, unit_number_or_name, unit_ty
     ('30000001-0000-0000-0000-000000000001', '20000001-0000-0000-0000-000000000001', '2 Bedroom Suite #402', 'two_bedroom', 2, 2.0, 1150, 2850.00, 'USD', 2850.00, 'monthly', 2, 'available', 'Corner unit with panoramic skyline views.'),
     ('30000001-0000-0000-0000-000000000002', '20000001-0000-0000-0000-000000000001', '1 Bedroom Suite #208', 'one_bedroom', 1, 1.0, 780, 2150.00, 'USD', 2150.00, 'monthly', 3, 'available', 'Sun-drenched layout with private balcony.'),
     ('30000001-0000-0000-0000-000000000003', '20000001-0000-0000-0000-000000000002', 'Studio Loft #1105', 'studio', 0, 1.0, 520, 1950.00, 'CAD', 1950.00, 'monthly', 1, 'available', 'Furnished modern studio with Murphy bed.'),
-    ('30000001-0000-0000-0000-000000000004', '20000001-0000-0000-0000-000000000003', 'Whole Townhouse', 'three_bedroom', 3, 2.5, 1850, 3400.00, 'GBP', 3400.00, 'monthly', 1, 'available', 'Complete multi-level residence with garden patio.'),
-    ('30000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000004', 'Waterfront Suite #1802', 'one_bedroom', 1, 1.0, 690, 2400.00, 'CAD', 1200.00, 'monthly', 1, 'available', 'Bright open layout with high ceilings.'),
-    ('30000001-0000-0000-0000-000000000006', '20000001-0000-0000-0000-000000000005', 'Unit A', 'two_bedroom', 2, 2.0, 1200, 2600.00, 'USD', 2600.00, 'monthly', 1, 'available', 'Austin modern duplex with fenced yard.'),
-    ('30000001-0000-0000-0000-000000000007', '20000001-0000-0000-0000-000000000006', 'Penthouse #3801', 'penthouse', 3, 3.0, 2200, 5200.00, 'AUD', 5200.00, 'monthly', 1, 'available', 'Luxury Sydney Harbour Penthouse.')
+    ('30000001-0000-0000-0000-000000000004', '20000001-0000-0000-0000-000000000003', 'Whole Townhouse', 'three_bedroom', 3, 2.5, 1850, 3400.00, 'USD', 3400.00, 'monthly', 1, 'available', 'Complete multi-level residence with garden patio.'),
+    ('30000001-0000-0000-0000-000000000004', '20000001-0000-0000-0000-000000000004', 'Waterfront Suite #1802', 'one_bedroom', 1, 1.0, 690, 2400.00, 'CAD', 1200.00, 'monthly', 1, 'available', 'Bright open layout with high ceilings.'),
+    ('30000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000005', 'Unit A', 'two_bedroom', 2, 2.0, 1200, 2600.00, 'USD', 2600.00, 'monthly', 1, 'available', 'Charlotte modern duplex with fenced yard.'),
+    ('30000001-0000-0000-0000-000000000006', '20000001-0000-0000-0000-000000000006', 'Main Executive Residence', 'entire_house', 3, 3.0, 2200, 4800.00, 'USD', 4800.00, 'monthly', 1, 'available', 'Luxury Mountain View Executive House.')
 ON CONFLICT (id) DO NOTHING;
 
 -- 9. Property Images
@@ -127,8 +128,8 @@ ON CONFLICT DO NOTHING;
 
 -- 11. Rental Applications & Vault Documents
 INSERT INTO public.rental_applications (id, application_ref, applicant_id, property_id, unit_id, applicant_name, applicant_email, applicant_phone, applicant_dob, applicant_nationality, applicant_address, applicant_employer, applicant_occupation, applicant_income, status, desired_move_in, lease_term_months, occupants_count, has_pets, additional_notes, submitted_at) VALUES
-    ('50000001-0000-0000-0000-000000000001', 'BS-10293', 'd0000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000001', '30000001-0000-0000-0000-000000000001', 'John Doe', 'john.doe@example.com', '+1 (213) 555-0199', '1992-05-14', 'United States', '450 Grand Ave, Apt 12B, Los Angeles, CA 90012', 'Apex Tech Solutions', 'Senior Software Engineer', 9500.00, 'under_review', '2026-09-01', 12, 2, FALSE, 'Relocating closer to office. Verifiable rental history.', NOW() - INTERVAL '2 days'),
-    ('50000001-0000-0000-0000-000000000002', 'BS-10211', 'd0000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000002', '30000001-0000-0000-0000-000000000003', 'John Doe', 'john.doe@example.com', '+1 (213) 555-0199', '1992-05-14', 'United States', '450 Grand Ave, Apt 12B, Los Angeles, CA 90012', 'Apex Tech Solutions', 'Senior Software Engineer', 9500.00, 'approved', '2026-09-15', 12, 1, FALSE, NULL, NOW() - INTERVAL '10 days')
+    ('50000001-0000-0000-0000-000000000001', 'BS-10293', 'd0000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000001', '30000001-0000-0000-0000-000000000001', 'John Doe', 'john.doe@example.com', '+1 (213) 555-0199', '1992-05-14', 'United States', '950 Peachtree St NE, Apt 12B, Atlanta, GA 30309', 'Apex Tech Solutions', 'Senior Software Engineer', 9500.00, 'under_review', '2026-09-01', 12, 2, FALSE, 'Relocating closer to office. Verifiable rental history.', NOW() - INTERVAL '2 days'),
+    ('50000001-0000-0000-0000-000000000002', 'BS-10211', 'd0000001-0000-0000-0000-000000000005', '20000001-0000-0000-0000-000000000002', '30000001-0000-0000-0000-000000000003', 'John Doe', 'john.doe@example.com', '+1 (213) 555-0199', '1992-05-14', 'United States', '950 Peachtree St NE, Apt 12B, Atlanta, GA 30309', 'Apex Tech Solutions', 'Senior Software Engineer', 9500.00, 'approved', '2026-09-15', 12, 1, FALSE, NULL, NOW() - INTERVAL '10 days')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.application_documents (id, application_id, document_type, file_name, storage_path, file_size_bytes, mime_type, status) VALUES

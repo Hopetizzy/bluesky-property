@@ -26,6 +26,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { propertiesDb } from '@/lib/db/properties';
 import { store } from '@/lib/store';
 import { Property, PropertyUnit, PropertyType, UnitType } from '@/lib/types';
+import { SUPPORTED_REGIONS, getStatesForCountry } from '@/lib/constants';
 
 interface UnitFormItem {
   id?: string;
@@ -356,8 +357,8 @@ export default function AdminEditPropertyPage() {
       property_type: propertyType,
       country_code: countryCode,
       country_name: countryNames[countryCode] || countryCode,
-      state_province: stateProvince.trim() || 'California',
-      city: city.trim() || 'Los Angeles',
+      state_province: stateProvince.trim() || 'Georgia',
+      city: city.trim() || 'Atlanta',
       neighborhood: neighborhood.trim() || undefined,
       street_address: streetAddress.trim() || '1000 Wilshire Blvd',
       postal_code: postalCode.trim() || '90017',
@@ -532,13 +533,12 @@ export default function AdminEditPropertyPage() {
                     className="form-select"
                   >
                     <option value="apartment">Apartment</option>
-                    <option value="single_family_house">Single Family House</option>
+                    <option value="house">House / Single Family</option>
                     <option value="townhouse">Townhouse</option>
-                    <option value="condo">Condo</option>
                     <option value="duplex">Duplex</option>
                     <option value="studio">Studio</option>
-                    <option value="penthouse">Penthouse</option>
                     <option value="commercial">Commercial</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
 
@@ -760,27 +760,37 @@ export default function AdminEditPropertyPage() {
                   <label className="form-label">Country Scope *</label>
                   <select
                     value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
+                    onChange={(e) => {
+                      setCountryCode(e.target.value);
+                      setStateProvince('');
+                    }}
                     className="form-select"
+                    style={{ fontWeight: 600 }}
                   >
-                    <option value="USA">United States (USA)</option>
-                    <option value="CAN">Canada (CAN)</option>
-                    <option value="GBR">United Kingdom (GBR)</option>
-                    <option value="AUS">Australia (AUS)</option>
-                    <option value="EUR">European Union (EUR)</option>
+                    {SUPPORTED_REGIONS.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.name} ({c.currency})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">State / Province / Region *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. California, Ontario, London, NSW"
+                  <select
                     value={stateProvince}
                     onChange={(e) => setStateProvince(e.target.value)}
-                    className="form-input"
+                    className="form-select"
                     required
-                  />
+                    style={{ fontWeight: 600 }}
+                  >
+                    <option value="">Select State / Province</option>
+                    {getStatesForCountry(countryCode).map((s) => (
+                      <option key={s.code} value={s.name}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -789,7 +799,7 @@ export default function AdminEditPropertyPage() {
                   <label className="form-label">City *</label>
                   <input
                     type="text"
-                    placeholder="e.g. Los Angeles, Toronto, London"
+                    placeholder="e.g. Atlanta, Charlotte, Toronto..."
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     className="form-input"

@@ -204,6 +204,10 @@ export default function SettingsPage() {
       if (!json.success) throw new Error(json.error || 'Failed to save site settings');
 
       setConfigSuccessMsg('Brand support & social links updated successfully! Live on site footer.');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bluesky_site_config', JSON.stringify(siteConfig));
+        window.dispatchEvent(new CustomEvent('site-config-updated', { detail: siteConfig }));
+      }
       setTimeout(() => setConfigSuccessMsg(''), 4000);
     } catch (err: any) {
       setConfigErrorMsg(err.message || 'Failed to save settings.');
