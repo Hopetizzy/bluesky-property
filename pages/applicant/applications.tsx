@@ -35,7 +35,13 @@ export default function MyApplicationsPage() {
               .from('rental_applications')
               .select(`
                 *,
-                properties (title, street_address, city, state_province),
+                properties (
+                  title,
+                  street_address,
+                  city,
+                  state_province,
+                  property_images (storage_path, is_primary, sort_order)
+                ),
                 property_units (unit_number_or_name, rent_amount, currency_code)
               `)
               .order('submitted_at', { ascending: false });
@@ -49,32 +55,41 @@ export default function MyApplicationsPage() {
             const { data: dbApps } = await query;
 
             if (dbApps && dbApps.length > 0) {
-              appList = dbApps.map((row: any) => ({
-                id: String(row.id),
-                application_ref: row.application_ref,
-                applicant_id: row.applicant_id,
-                property_id: row.property_id,
-                unit_id: row.unit_id,
-                applicant_name: row.applicant_name,
-                applicant_email: row.applicant_email,
-                applicant_phone: row.applicant_phone,
-                status: row.status,
-                desired_move_in: row.desired_move_in,
-                lease_term_months: row.lease_term_months,
-                occupants_count: row.occupants_count,
-                has_pets: row.has_pets,
-                submitted_at: row.submitted_at || row.created_at,
-                reviewed_at: row.reviewed_at,
-                reviewed_by: row.reviewed_by,
-                property_title: row.properties?.title || 'Residential Property',
-                property_address: row.properties
-                  ? `${row.properties.street_address}, ${row.properties.city}`
-                  : 'Property Address',
-                unit_name: row.property_units?.unit_number_or_name || 'Standard Unit',
-                unit_rent: row.property_units?.rent_amount || 0,
-                unit_currency: row.property_units?.currency_code || 'USD',
-                documents: [],
-              }));
+              appList = dbApps.map((row: any) => {
+                const primaryImg =
+                  row.properties?.property_images?.find((pi: any) => pi.is_primary)?.storage_path ||
+                  row.properties?.property_images?.[0]?.storage_path ||
+                  row.property_image ||
+                  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+
+                return {
+                  id: String(row.id),
+                  application_ref: row.application_ref,
+                  applicant_id: row.applicant_id,
+                  property_id: row.property_id,
+                  unit_id: row.unit_id,
+                  applicant_name: row.applicant_name,
+                  applicant_email: row.applicant_email,
+                  applicant_phone: row.applicant_phone,
+                  status: row.status,
+                  desired_move_in: row.desired_move_in,
+                  lease_term_months: row.lease_term_months,
+                  occupants_count: row.occupants_count,
+                  has_pets: row.has_pets,
+                  submitted_at: row.submitted_at || row.created_at,
+                  reviewed_at: row.reviewed_at,
+                  reviewed_by: row.reviewed_by,
+                  property_title: row.properties?.title || 'Residential Property',
+                  property_address: row.properties
+                    ? `${row.properties.street_address}, ${row.properties.city}`
+                    : 'Property Address',
+                  property_image: primaryImg,
+                  unit_name: row.property_units?.unit_number_or_name || 'Standard Unit',
+                  unit_rent: row.property_units?.rent_amount || 0,
+                  unit_currency: row.property_units?.currency_code || 'USD',
+                  documents: [],
+                };
+              });
             }
           } else {
             appList = [];
@@ -213,7 +228,8 @@ export default function MyApplicationsPage() {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  padding: 20,
+                  padding: 0,
+                  overflow: 'hidden',
                   borderRadius: 'var(--radius-xl)',
                   backgroundColor: 'var(--color-white)',
                   border: '1px solid var(--color-border)',
@@ -221,32 +237,54 @@ export default function MyApplicationsPage() {
                   transition: 'all 0.15s ease',
                 }}
               >
-                <div>
-                  <div className="flex-between" style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
-                      {app.property_title}
-                    </div>
+                {/* Property Image Banner */}
+                <div
+                  style={{
+                    position: 'relative',
+                    height: 140,
+                    width: '100%',
+                    backgroundColor: 'var(--color-surface-subtle)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <img
+                    src={app.property_image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                    alt={app.property_title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+                    }}
+                  />
+                  <div style={{ position: 'absolute', top: 10, right: 10 }}>
                     <Badge variant={app.status === 'approved' ? 'approved' : app.status === 'rejected' ? 'rejected' : 'under_review'}>
                       {app.status.replace('_', ' ')}
                     </Badge>
                   </div>
-
-                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
-                    {app.property_address}
-                  </div>
-
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', marginBottom: 14 }}>
-                    {app.unit_name} • ${app.unit_rent.toLocaleString()}/month
-                  </div>
                 </div>
 
-                <div className="flex-between" style={{ borderTop: '1px solid var(--color-surface-subtle)', paddingTop: 12 }}>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                    Ref: <strong>{app.application_ref}</strong> • {new Date(app.submitted_at).toLocaleDateString()}
+                <div style={{ padding: 18, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)', marginBottom: 4 }}>
+                      {app.property_title}
+                    </div>
+
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                      {app.property_address}
+                    </div>
+
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', marginBottom: 14 }}>
+                      {app.unit_name} • ${app.unit_rent.toLocaleString()}/month
+                    </div>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    View Progress <ChevronRight size={15} />
-                  </span>
+
+                  <div className="flex-between" style={{ borderTop: '1px solid var(--color-surface-subtle)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                      Ref: <strong>{app.application_ref}</strong> • {new Date(app.submitted_at).toLocaleDateString()}
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      View Progress <ChevronRight size={15} />
+                    </span>
+                  </div>
                 </div>
               </Link>
             ))}

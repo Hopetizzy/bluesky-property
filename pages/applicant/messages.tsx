@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { store } from '@/lib/store';
 import { Message, Conversation } from '@/lib/types';
+import { DEFAULT_SITE_CONFIG, SiteConfigSettings } from '@/pages/api/settings/site-config';
 
 export default function MessagesPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function MessagesPage() {
   const [currentUserName, setCurrentUserName] = useState('Applicant');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [siteConfig, setSiteConfig] = useState<SiteConfigSettings>(DEFAULT_SITE_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -23,6 +25,18 @@ export default function MessagesPage() {
     async function loadConversations() {
       setIsLoading(true);
       try {
+        // Fetch live platform support details from database
+        try {
+          const cfgRes = await fetch('/api/settings/site-config');
+          if (cfgRes.ok) {
+            const cfgData = await cfgRes.json();
+            if (cfgData?.data) setSiteConfig(cfgData.data);
+            else if (cfgData?.support_email) setSiteConfig(cfgData);
+          }
+        } catch (cfgErr) {
+          console.warn('Site config fetch note:', cfgErr);
+        }
+
         let convList: Conversation[] = [];
         let name = 'Applicant';
         let email = '';
@@ -300,31 +314,91 @@ export default function MessagesPage() {
       localStorage.setItem(`bluesky_chat_${currentUserEmail}_${activeConversationId}`, JSON.stringify(updatedList));
     }
 
-    // 2. Keyword Assistant or Support Desk Response
-    setTimeout(() => {
-      const matchedFAQ = store.matchKeywordFAQ(userText);
+    // 2. Smart Support & Assistant Response
+    setTimeout(async () => {
+      const normalized = userText.toLowerCase().trim();
 
-      let botMsg: Message;
-      if (matchedFAQ) {
-        botMsg = {
-          id: `msg-${Date.now() + 1}`,
-          conversation_id: activeConversationId || 'conv-support',
-          sender_name: 'Blue Sky Assistant',
-          is_admin: true,
-          is_automated: true,
-          message_body: matchedFAQ.answer,
-          created_at: new Date().toISOString(),
-        };
+      // Check if user is asking for direct support, email, phone, address, or team contact
+      const isSupportContactQuery = [
+        'support',
+        'contact',
+        'phone',
+        'email',
+        'call',
+        'reach',
+        'help',
+        'customer service',
+        'agent',
+        'representative',
+        'office',
+        'address',
+        'speak to',
+        'talk to',
+        'hotline',
+        'desk',
+        'hours',
+        'number',
+        'mail',
+        'human',
+        'person',
+        'operator',
+        'team',
+      ].some((k) => normalized.includes(k));
+
+      let botMsgBody = '';
+      let botSenderName = 'Blue Sky Assistant';
+
+      if (isSupportContactQuery) {
+        botSenderName = 'Blue Sky Support Desk';
+        botMsgBody = `You can connect directly with the Blue Sky Property Support & Verification Team through the following channels:
+
+• Support Email: ${siteConfig.support_email || 'support@blueskyproperty.com'}
+• Direct Phone Line: ${siteConfig.support_phone || '+1 (800) 555-0199'}
+• Office Location: ${siteConfig.office_address || '950 Peachtree St NE, Suite 800, Atlanta, GA 30309'}
+• Operating Hours: Monday – Friday: 8:00 AM – 8:00 PM EST (ID Vault Verification: 24/7)
+
+Our review specialists monitor incoming application channels continuously. You can also write your specific inquiry right here and an agent will reply directly.`;
       } else {
-        botMsg = {
-          id: `msg-${Date.now() + 2}`,
-          conversation_id: activeConversationId || 'conv-support',
-          sender_name: 'Blue Sky Property Manager',
-          is_admin: true,
-          is_automated: false,
-          message_body: 'Thank you for reaching out! A verified Blue Sky property review specialist has received your message regarding this application and will assist you shortly.',
-          created_at: new Date().toISOString(),
-        };
+        const matchedFAQ = store.matchKeywordFAQ(userText);
+        if (matchedFAQ) {
+          botMsgBody = matchedFAQ.answer;
+        } else {
+          botSenderName = 'Blue Sky Property Manager';
+          botMsgBody = 'Thank you for reaching out! A verified Blue Sky property review specialist has received your message regarding this application and will assist you shortly.';
+        }
+      }
+
+      const botMsg: Message = {
+        id: `msg-${Date.now() + 1}`,
+        conversation_id: activeConversationId || 'conv-support',
+        sender_name: botSenderName,
+        is_admin: true,
+        is_automated: true,
+        message_body: botMsgBody,
+        created_at: new Date().toISOString(),
+      };
+
+      // Persist bot message to Supabase so Admin sees complete thread
+      if (isSupabaseConfigured() && activeConversationId) {
+        try {
+          await supabase.from('messages').insert({
+            conversation_id: activeConversationId,
+            sender_id: null,
+            sender_name: botSenderName,
+            is_admin: true,
+            is_automated: true,
+            message_body: botMsgBody,
+          });
+
+          await supabase
+            .from('conversations')
+            .update({
+              last_message_at: new Date().toISOString(),
+            })
+            .eq('id', activeConversationId);
+        } catch (err) {
+          console.warn('Bot message db insert note:', err);
+        }
       }
 
       const withBot = [...updatedList, botMsg];

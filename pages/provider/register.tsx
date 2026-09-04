@@ -366,11 +366,11 @@ export default function ProviderRegisterPage() {
                   onChange={(e) => setCountry(e.target.value)}
                   className="form-select"
                 >
-                  <option value="USA">🇺🇸 United States</option>
-                  <option value="CAN">🇨🇦 Canada</option>
-                  <option value="GBR">🇬🇧 United Kingdom</option>
-                  <option value="AUS">🇦🇺 Australia</option>
-                  <option value="EUR">🇪🇺 Europe</option>
+                  <option value="USA">United States (USA)</option>
+                  <option value="CAN">Canada (CAN)</option>
+                  <option value="GBR">United Kingdom (GBR)</option>
+                  <option value="AUS">Australia (AUS)</option>
+                  <option value="EUR">European Union (EUR)</option>
                 </select>
               </div>
             </div>

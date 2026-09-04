@@ -37,10 +37,11 @@ export default function PropertiesExplorePage() {
   // Filter states
   const [selectedType, setSelectedType] = useState('all');
   const [selectedBeds, setSelectedBeds] = useState('all');
+  const [selectedUploadDate, setSelectedUploadDate] = useState('all');
   const [maxRent, setMaxRent] = useState(6000);
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'featured' | 'price_low' | 'price_high'>('featured');
+  const [sortBy, setSortBy] = useState<'featured' | 'newest' | 'oldest' | 'price_low' | 'price_high'>('featured');
 
   const allAmenities = [
     'Parking',
@@ -64,11 +65,13 @@ export default function PropertiesExplorePage() {
       const typeParam = router.query.type as string;
       const countryParam = router.query.country as string;
       const stateParam = router.query.state as string;
+      const uploadDateParam = router.query.upload_date as string;
 
       if (locationParam) setSearchQuery(locationParam);
       if (typeParam) setSelectedType(typeParam);
       if (countryParam) setSelectedCountry(countryParam);
       if (stateParam) setSelectedState(stateParam);
+      if (uploadDateParam) setSelectedUploadDate(uploadDateParam);
     }
     loadProperties();
   }, [router.query]);
@@ -114,6 +117,27 @@ export default function PropertiesExplorePage() {
       result = result.filter((p) => p.units.some((u) => u.bedrooms === targetBeds));
     }
 
+    // Filter by Date of Property Upload
+    if (selectedUploadDate !== 'all') {
+      const now = Date.now();
+      const intervals: Record<string, number> = {
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+        '30d': 30 * 24 * 60 * 60 * 1000,
+        '90d': 90 * 24 * 60 * 60 * 1000,
+        '1y': 365 * 24 * 60 * 60 * 1000,
+      };
+      const maxAge = intervals[selectedUploadDate];
+      if (maxAge) {
+        result = result.filter((p) => {
+          const dateStr = p.created_at || p.published_at;
+          if (!dateStr) return true;
+          const uploadedTime = new Date(dateStr).getTime();
+          return now - uploadedTime <= maxAge;
+        });
+      }
+    }
+
     result = result.filter((p) => {
       const minRent = p.units.length > 0 ? Math.min(...p.units.map((u) => u.rent_amount)) : 0;
       return minRent <= maxRent;
@@ -125,7 +149,19 @@ export default function PropertiesExplorePage() {
       );
     }
 
-    if (sortBy === 'price_low') {
+    if (sortBy === 'newest') {
+      result.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.published_at || 0).getTime();
+        const timeB = new Date(b.created_at || b.published_at || 0).getTime();
+        return timeB - timeA;
+      });
+    } else if (sortBy === 'oldest') {
+      result.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.published_at || 0).getTime();
+        const timeB = new Date(b.created_at || b.published_at || 0).getTime();
+        return timeA - timeB;
+      });
+    } else if (sortBy === 'price_low') {
       result.sort((a, b) => {
         const rentA = Math.min(...a.units.map((u) => u.rent_amount));
         const rentB = Math.min(...b.units.map((u) => u.rent_amount));
@@ -137,10 +173,12 @@ export default function PropertiesExplorePage() {
         const rentB = Math.min(...b.units.map((u) => u.rent_amount));
         return rentB - rentA;
       });
+    } else if (sortBy === 'featured') {
+      result.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
     }
 
     setFilteredProperties(result);
-  }, [properties, selectedCountry, selectedState, searchQuery, selectedType, selectedBeds, maxRent, selectedAmenities, sortBy]);
+  }, [properties, selectedCountry, selectedState, searchQuery, selectedType, selectedBeds, selectedUploadDate, maxRent, selectedAmenities, sortBy]);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -166,6 +204,7 @@ export default function PropertiesExplorePage() {
     setSelectedState('');
     setSelectedType('all');
     setSelectedBeds('all');
+    setSelectedUploadDate('all');
     setMaxRent(6000);
     setSelectedPeriod('all');
     setSelectedAmenities([]);
@@ -209,7 +248,7 @@ export default function PropertiesExplorePage() {
                 </p>
               </div>
 
-              {(selectedCountry || selectedState || selectedAmenities.length > 0 || selectedType !== 'all' || selectedBeds !== 'all' || searchQuery) && (
+              {(selectedCountry || selectedState || selectedAmenities.length > 0 || selectedType !== 'all' || selectedBeds !== 'all' || selectedUploadDate !== 'all' || searchQuery) && (
                 <button
                   onClick={handleResetFilters}
                   style={{
@@ -336,7 +375,22 @@ export default function PropertiesExplorePage() {
                 <option value="3">3+ Bedrooms</option>
               </select>
 
-              {/* 6. Filter Sheet & Sort */}
+              {/* 6. Upload Date Dropdown */}
+              <select
+                value={selectedUploadDate}
+                onChange={(e) => setSelectedUploadDate(e.target.value)}
+                className="form-select"
+                style={{ height: 46, backgroundColor: 'var(--color-surface-subtle)', fontWeight: 600 }}
+              >
+                <option value="all">Any Upload Date</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days (Past Week)</option>
+                <option value="30d">Last 30 Days (Past Month)</option>
+                <option value="90d">Last 90 Days</option>
+                <option value="1y">Past Year</option>
+              </select>
+
+              {/* 7. Filter Sheet & Sort */}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   type="button"
@@ -347,9 +401,9 @@ export default function PropertiesExplorePage() {
                     height: 46,
                     padding: '0 10px',
                     fontSize: 12,
-                    backgroundColor: selectedAmenities.length > 0 ? 'var(--color-primary-tint)' : 'var(--color-surface-subtle)',
-                    color: selectedAmenities.length > 0 ? 'var(--color-primary)' : 'var(--color-navy-dark)',
-                    borderColor: selectedAmenities.length > 0 ? 'var(--color-primary)' : 'var(--color-border)',
+                    backgroundColor: (selectedAmenities.length > 0 || selectedUploadDate !== 'all') ? 'var(--color-primary-tint)' : 'var(--color-surface-subtle)',
+                    color: (selectedAmenities.length > 0 || selectedUploadDate !== 'all') ? 'var(--color-primary)' : 'var(--color-navy-dark)',
+                    borderColor: (selectedAmenities.length > 0 || selectedUploadDate !== 'all') ? 'var(--color-primary)' : 'var(--color-border)',
                   }}
                 >
                   <SlidersHorizontal size={14} /> More {selectedAmenities.length > 0 ? `(${selectedAmenities.length})` : ''}
@@ -359,9 +413,11 @@ export default function PropertiesExplorePage() {
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
                   className="form-select"
-                  style={{ width: 'auto', height: 46, backgroundColor: 'var(--color-surface-subtle)', fontSize: 12 }}
+                  style={{ width: 'auto', height: 46, backgroundColor: 'var(--color-surface-subtle)', fontSize: 12, fontWeight: 600 }}
                 >
                   <option value="featured">Featured</option>
+                  <option value="newest">Newest Listed</option>
+                  <option value="oldest">Oldest Listed</option>
                   <option value="price_low">$ Low to High</option>
                   <option value="price_high">$ High to Low</option>
                 </select>
@@ -507,6 +563,40 @@ export default function PropertiesExplorePage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Upload Date Selection in Sheet */}
+          <div>
+            <label className="form-label">Date of Property Upload</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {[
+                { id: 'all', label: 'Any Time / All' },
+                { id: '24h', label: 'Last 24 Hours' },
+                { id: '7d', label: 'Past 7 Days' },
+                { id: '30d', label: 'Past 30 Days' },
+                { id: '90d', label: 'Past 90 Days' },
+                { id: '1y', label: 'Past Year' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelectedUploadDate(opt.id)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: selectedUploadDate === opt.id ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    backgroundColor: selectedUploadDate === opt.id ? 'var(--color-primary-tint)' : 'var(--color-white)',
+                    color: selectedUploadDate === opt.id ? 'var(--color-primary)' : 'var(--color-navy-dark)',
+                    fontSize: 12,
+                    fontWeight: selectedUploadDate === opt.id ? 700 : 500,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 

@@ -15,6 +15,7 @@ import {
   RefreshCw,
   TrendingUp,
   Settings,
+  MessageSquare,
   HelpCircle,
   ArrowRight,
   ExternalLink,
@@ -189,7 +190,7 @@ export default function AdminDashboardPage() {
 
             {/* Easily Accessible Settings Button */}
             <Link
-              href="/settings"
+              href="/admin/settings"
               className="btn btn-outline"
               style={{
                 display: 'flex',
@@ -203,6 +204,23 @@ export default function AdminDashboardPage() {
             >
               <Settings size={14} />
               <span>Settings</span>
+            </Link>
+
+            <Link
+              href="/admin/messages"
+              className="btn btn-outline"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              <MessageSquare size={14} />
+              <span>Support Inquiries</span>
             </Link>
 
             <Link
@@ -826,7 +844,7 @@ export default function AdminDashboardPage() {
 
             {/* Module 6: Account Security & Settings */}
             <Link
-              href="/settings"
+              href="/admin/settings"
               className="card"
               style={{
                 margin: 0,

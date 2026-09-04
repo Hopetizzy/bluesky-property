@@ -32,6 +32,7 @@ import {
   Send,
   Sparkles,
   EyeOff,
+  CreditCard,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
@@ -39,6 +40,20 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import { applicationsDb } from '@/lib/db/applications';
 import { store } from '@/lib/store';
 import { RentalApplication, ApplicationStatus, ApplicationDocument } from '@/lib/types';
+
+function resolveDocumentUrl(pathOrUrl?: string): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('data:')) {
+    return pathOrUrl;
+  }
+  if (pathOrUrl.startsWith('/vault/')) {
+    return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
+  }
+  if (pathOrUrl.startsWith('/payments/')) {
+    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
+  }
+  return `/api/vault/view?path=${encodeURIComponent(pathOrUrl)}`;
+}
 
 export default function AdminApplicationsPage() {
   const router = useRouter();
@@ -54,6 +69,8 @@ export default function AdminApplicationsPage() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [inspectingDoc, setInspectingDoc] = useState<ApplicationDocument | null>(null);
+  const [adminDocImgFailed, setAdminDocImgFailed] = useState(false);
+  const [adminPaymentImgFailed, setAdminPaymentImgFailed] = useState(false);
   const [revealedSSNs, setRevealedSSNs] = useState<Record<string, boolean>>({});
 
   const toggleRevealSSN = (id: string) => {
@@ -90,6 +107,44 @@ export default function AdminApplicationsPage() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+
+  const handleUpdatePaymentStatus = async (paymentId: string, status: 'verified' | 'rejected') => {
+    setIsVerifyingPayment(true);
+    try {
+      const res = await fetch('/api/admin/applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment_id: paymentId,
+          payment_status: status,
+          reviewer_name: 'Admin Underwriter',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApplications((prev) =>
+          prev.map((app) => {
+            if (app.payment?.id === paymentId) {
+              return {
+                ...app,
+                payment: { ...app.payment, status },
+              };
+            }
+            return app;
+          })
+        );
+        if (inspectingApp?.payment?.id === paymentId) {
+          setInspectingApp((prev) => (prev ? { ...prev, payment: { ...prev.payment!, status } } : null));
+        }
+      }
+    } catch (e) {
+      console.warn('Payment update note:', e);
+    } finally {
+      setIsVerifyingPayment(false);
     }
   };
 
@@ -141,7 +196,7 @@ export default function AdminApplicationsPage() {
 
     setIsActionLoading(true);
     try {
-      await applicationsDb.updateApplicationStatus(app.id, status, 'Super Admin');
+      await applicationsDb.updateApplicationStatus(app.id, status, 'Super Admin', decisionNotes.trim() || undefined);
       await loadApplications();
       setActionSuccessMsg(
         status === 'approved'
@@ -616,23 +671,29 @@ Email: leasing@blueskyproperty.com
                 >
                   {/* Top Candidate & Property Strip */}
                   <div className="flex-between" style={{ alignItems: 'flex-start', marginBottom: 10 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: '#EFF6FF',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--color-primary)',
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: 'var(--radius-md)',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          backgroundColor: 'var(--color-surface-subtle)',
+                          border: '1px solid var(--color-border)',
+                        }}
+                      >
+                        <img
+                          src={app.property_image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                          alt={app.property_title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
                           }}
-                        >
-                          <User size={16} />
-                        </div>
-                        <div>
+                        />
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
                             {app.applicant_name}
                           </span>
@@ -644,29 +705,28 @@ Email: leasing@blueskyproperty.com
                               padding: '2px 6px',
                               borderRadius: 4,
                               color: 'var(--color-navy-dark)',
-                              marginLeft: 8,
                             }}
                           >
                             {app.application_ref}
                           </span>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>
-                          Target: <strong style={{ color: 'var(--color-navy-dark)' }}>{app.property_title || 'Residence'}</strong>
-                        </span>
-                        {app.unit_name && (
-                          <>
-                            <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                            <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{app.unit_name}</span>
-                          </>
-                        )}
-                        {app.unit_rent && (
-                          <span style={{ color: 'var(--color-text-muted)' }}>
-                            (${app.unit_rent.toLocaleString()}/mo)
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 4, fontSize: 12 }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>
+                            Target: <strong style={{ color: 'var(--color-navy-dark)' }}>{app.property_title || 'Residence'}</strong>
                           </span>
-                        )}
+                          {app.unit_name && (
+                            <>
+                              <span style={{ color: 'var(--color-text-muted)' }}>•</span>
+                              <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{app.unit_name}</span>
+                            </>
+                          )}
+                          {app.unit_rent && (
+                            <span style={{ color: 'var(--color-text-muted)' }}>
+                              (${app.unit_rent.toLocaleString()}/mo)
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -891,9 +951,12 @@ Email: leasing@blueskyproperty.com
                 }}
               >
                 <img
-                  src={inspectingApp.property_image}
+                  src={inspectingApp.property_image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
                   alt={inspectingApp.property_title}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+                  }}
                 />
                 <div
                   style={{
@@ -1122,7 +1185,10 @@ Email: leasing@blueskyproperty.com
                         {doc.storage_path && (
                           <button
                             type="button"
-                            onClick={() => setInspectingDoc(inspectingDoc?.id === doc.id ? null : doc)}
+                            onClick={() => {
+                              setAdminDocImgFailed(false);
+                              setInspectingDoc(inspectingDoc?.id === doc.id ? null : doc);
+                            }}
                             className="btn btn-outline-secondary btn-sm"
                             style={{ padding: '3px 8px', fontSize: 11 }}
                           >
@@ -1149,7 +1215,7 @@ Email: leasing@blueskyproperty.com
                   <div className="flex-between" style={{ marginBottom: 6, color: 'white', fontSize: 12 }}>
                     <span>Preview: {getDocumentTypeLabel(inspectingDoc.document_type)}</span>
                     <a
-                      href={inspectingDoc.storage_path}
+                      href={resolveDocumentUrl(inspectingDoc.storage_path)}
                       target="_blank"
                       rel="noreferrer"
                       style={{ color: '#93C5FD', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
@@ -1157,13 +1223,152 @@ Email: leasing@blueskyproperty.com
                       <ExternalLink size={12} /> Open Full Document
                     </a>
                   </div>
-                  <div style={{ height: 240, overflow: 'hidden', borderRadius: 6 }}>
-                    <img
-                      src={inspectingDoc.storage_path}
-                      alt="Vault Document"
-                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    />
+                  <div style={{ height: 240, overflow: 'hidden', borderRadius: 6, backgroundColor: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {!adminDocImgFailed ? (
+                      <img
+                        src={resolveDocumentUrl(inspectingDoc.storage_path)}
+                        alt="Vault Document"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        onError={() => setAdminDocImgFailed(true)}
+                      />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: 20 }}>
+                        <FileText size={48} color="#38BDF8" style={{ margin: '0 auto 8px auto' }} />
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC' }}>
+                          {getDocumentTypeLabel(inspectingDoc.document_type)}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                          {inspectingDoc.file_name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#38BDF8', marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: 'rgba(2, 132, 199, 0.15)', padding: '4px 10px', borderRadius: 4, border: '1px solid #0284C7' }}>
+                          <ShieldCheck size={12} /> Encrypted Underwriting File
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Application Verification Fee Payment & Receipt Proof */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CreditCard size={16} color="var(--color-primary)" />
+                Application Screening Fee Payment
+              </div>
+
+              {inspectingApp.payment || inspectingApp.payments?.[0] ? (
+                (() => {
+                  const pmt = inspectingApp.payment || inspectingApp.payments![0];
+                  const pmtProofUrl = resolveDocumentUrl(pmt.proof_storage_path);
+                  return (
+                    <div
+                      style={{
+                        padding: 14,
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: 'var(--color-surface-subtle)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <div className="flex-between" style={{ marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--color-navy-dark)' }}>
+                            {pmt.payment_method_name || 'Application Fee'}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                            Amount: ${pmt.amount} {pmt.currency_code} • {pmt.submitted_at ? new Date(pmt.submitted_at).toLocaleDateString() : 'Recent Submission'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Badge variant={pmt.status === 'verified' ? 'verified' : pmt.status === 'rejected' ? 'danger' : 'pending'}>
+                            {pmt.status?.toUpperCase() || 'PENDING'}
+                          </Badge>
+                          {pmt.status === 'pending' && (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button
+                                type="button"
+                                disabled={isVerifyingPayment}
+                                onClick={() => handleUpdatePaymentStatus(pmt.id, 'verified')}
+                                className="btn btn-primary btn-sm"
+                                style={{ padding: '3px 8px', fontSize: 11 }}
+                              >
+                                {isVerifyingPayment ? '...' : 'Verify'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isVerifyingPayment}
+                                onClick={() => handleUpdatePaymentStatus(pmt.id, 'rejected')}
+                                className="btn btn-outline-secondary btn-sm"
+                                style={{ padding: '3px 8px', fontSize: 11, color: 'var(--color-danger)' }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {pmt.proof_storage_path && (
+                        <div>
+                          <div className="flex-between" style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                            <span>Uploaded Transaction Screenshot / Receipt:</span>
+                            <a
+                              href={pmtProofUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600, textDecoration: 'none' }}
+                            >
+                              <ExternalLink size={11} /> Open Full Receipt
+                            </a>
+                          </div>
+                          <div
+                            style={{
+                              height: 200,
+                              borderRadius: 'var(--radius-sm)',
+                              overflow: 'hidden',
+                              backgroundColor: '#0F172A',
+                              border: '1px solid var(--color-border)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {!adminPaymentImgFailed ? (
+                              <img
+                                src={pmtProofUrl}
+                                alt="Payment Proof Receipt"
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                onError={() => setAdminPaymentImgFailed(true)}
+                              />
+                            ) : (
+                              <div style={{ textAlign: 'center', padding: 16 }}>
+                                <CreditCard size={40} color="#38BDF8" style={{ margin: '0 auto 8px auto' }} />
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#F8FAFC' }}>
+                                  Screening Fee Payment Proof
+                                </div>
+                                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                                  {pmt.payment_method_name || 'Application Fee'} • ${pmt.amount} {pmt.currency_code}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                <div
+                  style={{
+                    padding: 12,
+                    backgroundColor: 'var(--color-surface-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 12,
+                    color: 'var(--color-text-muted)',
+                    textAlign: 'center',
+                  }}
+                >
+                  No payment receipt uploaded or application fee was waived.
                 </div>
               )}
             </div>

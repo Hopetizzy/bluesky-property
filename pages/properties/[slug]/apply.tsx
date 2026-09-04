@@ -25,12 +25,17 @@ import {
   Info,
   ChevronRight,
   ImageIcon,
+  Copy,
+  X,
+  ShieldCheck,
+  FileCheck2,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { store } from '@/lib/store';
 import { propertiesDb } from '@/lib/db';
+import { notifyNewApplication, notifyPaymentUploaded } from '@/lib/notificationService';
 import { Property, PropertyUnit, RentalApplication, PaymentMethod, ApplicationFeeSettings, DocumentType, ApplicationDocument } from '@/lib/types';
 
 interface UploadedFileRecord {
@@ -39,7 +44,22 @@ interface UploadedFileRecord {
   bytes: number;
   type: string;
   previewUrl?: string;
+  storagePath?: string;
   fromVault?: boolean;
+}
+
+function resolveDocumentUrl(pathOrUrl?: string, defaultName?: string): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('data:')) {
+    return pathOrUrl;
+  }
+  if (pathOrUrl.startsWith('/vault/')) {
+    return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
+  }
+  if (pathOrUrl.startsWith('/payments/')) {
+    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
+  }
+  return `/api/vault/view?path=${encodeURIComponent(pathOrUrl)}`;
 }
 
 function formatBytes(bytes: number): string {
@@ -110,6 +130,15 @@ export default function ApplyForPropertyPage() {
 
   // Preview Modal
   const [previewModalFile, setPreviewModalFile] = useState<{ name: string; title: string; previewUrl?: string; isImage?: boolean } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopy = (text: string, key: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
 
   // File Inputs Refs
   const frontInputRef = useRef<HTMLInputElement>(null);
@@ -198,16 +227,58 @@ export default function ApplyForPropertyPage() {
                 if (Array.isArray(vaultDocs)) {
                   const foundId = vaultDocs.find((d: any) => d.type === 'passport' || d.type === 'drivers_license' || d.type === 'national_id');
                   if (foundId) {
-                    setIdFrontFile({ name: foundId.name, size: foundId.size || '1.8 MB', bytes: 1800000, type: 'image/jpeg', fromVault: true });
-                    setIdBackFile({ name: `${foundId.name.split('.')[0]}_back.jpg`, size: '1.4 MB', bytes: 1400000, type: 'image/jpeg', fromVault: true });
+                    const frontStorage = foundId.storage_path || `/vault/${userEmail}/${foundId.name}`;
+                    const frontPreview = foundId.previewUrl || resolveDocumentUrl(frontStorage, foundId.name);
+                    setIdFrontFile({
+                      name: foundId.name,
+                      size: foundId.size || '1.8 MB',
+                      bytes: foundId.bytes || 1800000,
+                      type: foundId.mime_type || 'image/jpeg',
+                      previewUrl: frontPreview,
+                      storagePath: frontStorage,
+                      fromVault: true,
+                    });
+
+                    const backName = foundId.backName || `${foundId.name.split('.')[0]}_back.jpg`;
+                    const backStorage = foundId.back_storage_path || `/vault/${userEmail}/${backName}`;
+                    const backPreview = foundId.backPreviewUrl || resolveDocumentUrl(backStorage, backName);
+                    setIdBackFile({
+                      name: backName,
+                      size: '1.4 MB',
+                      bytes: 1400000,
+                      type: 'image/jpeg',
+                      previewUrl: backPreview,
+                      storagePath: backStorage,
+                      fromVault: true,
+                    });
                   }
                   const foundIncome = vaultDocs.find((d: any) => d.type === 'proof_of_income' || d.type === 'employment_letter' || d.type === 'bank_statement');
                   if (foundIncome) {
-                    setIncomeDoc({ name: foundIncome.name, size: foundIncome.size || '2.2 MB', bytes: 2200000, type: 'application/pdf', fromVault: true });
+                    const incStorage = foundIncome.storage_path || `/vault/${userEmail}/${foundIncome.name}`;
+                    const incPreview = foundIncome.previewUrl || resolveDocumentUrl(incStorage, foundIncome.name);
+                    setIncomeDoc({
+                      name: foundIncome.name,
+                      size: foundIncome.size || '2.2 MB',
+                      bytes: foundIncome.bytes || 2200000,
+                      type: foundIncome.mime_type || 'application/pdf',
+                      previewUrl: incPreview,
+                      storagePath: incStorage,
+                      fromVault: true,
+                    });
                   }
                   const foundAddress = vaultDocs.find((d: any) => d.type === 'utility_bill_address');
                   if (foundAddress) {
-                    setAddressDoc({ name: foundAddress.name, size: foundAddress.size || '1.1 MB', bytes: 1100000, type: 'application/pdf', fromVault: true });
+                    const addrStorage = foundAddress.storage_path || `/vault/${userEmail}/${foundAddress.name}`;
+                    const addrPreview = foundAddress.previewUrl || resolveDocumentUrl(addrStorage, foundAddress.name);
+                    setAddressDoc({
+                      name: foundAddress.name,
+                      size: foundAddress.size || '1.1 MB',
+                      bytes: foundAddress.bytes || 1100000,
+                      type: foundAddress.mime_type || 'application/pdf',
+                      previewUrl: addrPreview,
+                      storagePath: addrStorage,
+                      fromVault: true,
+                    });
                   }
                 }
               } catch (e) {}
@@ -240,22 +311,59 @@ export default function ApplyForPropertyPage() {
     );
   }
 
-  // Enhanced File Upload Handler with real Object URL preview and exact file size
+  // Enhanced File Upload Handler with instant persistent Data URL preview, exact file size, and background vault sync
   const handleGenericFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    setter: React.Dispatch<React.SetStateAction<UploadedFileRecord | null>>
+    setter: React.Dispatch<React.SetStateAction<UploadedFileRecord | null>>,
+    bucket: string = 'applicant-vault'
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      const previewUrl = URL.createObjectURL(file);
+      const initialObjUrl = URL.createObjectURL(file);
       setter({
         name: file.name,
         size: formatBytes(file.size),
         bytes: file.size,
         type: file.type,
-        previewUrl: previewUrl,
+        previewUrl: initialObjUrl,
         fromVault: false,
       });
+
+      // Convert to Base64 Data URL for persistent in-memory/localStorage preview
+      const reader = new FileReader();
+      reader.onload = async (uploadEvt) => {
+        const dataUrl = uploadEvt.target?.result as string;
+        setter((prev) => (prev ? { ...prev, previewUrl: dataUrl } : null));
+
+        // Sync to backend storage vault in background
+        try {
+          const res = await fetch('/api/vault/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileData: dataUrl,
+              bucket,
+              folder: email ? `vault_${email.replace(/[^a-zA-Z0-9]/g, '_')}` : 'vault',
+            }),
+          });
+          const json = await res.json();
+          if (json.success && json.storage_path) {
+            setter((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    storagePath: json.storage_path,
+                    previewUrl: json.preview_url || dataUrl,
+                  }
+                : null
+            );
+          }
+        } catch (uploadErr) {
+          console.warn('Vault upload background sync note:', uploadErr);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -321,6 +429,10 @@ export default function ApplyForPropertyPage() {
         property_id: property.id,
         property_title: property.title,
         property_address: `${property.street_address}, ${property.city}, ${property.state_province}`,
+        property_image:
+          property.images?.find((i) => i.is_primary)?.storage_path ||
+          property.images?.[0]?.storage_path ||
+          'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
         unit_id: selectedUnit?.id || 'unit-1',
         unit_name: selectedUnit?.unit_number_or_name || 'Standard Unit',
         unit_rent: selectedUnit?.rent_amount || 0,
@@ -339,7 +451,7 @@ export default function ApplyForPropertyPage() {
             application_id: newAppId,
             document_type: idType as DocumentType,
             file_name: idFrontFile?.name || 'id_front.jpg',
-            storage_path: `/vault/${email}/id_front.jpg`,
+            storage_path: idFrontFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile?.name || 'id_front.jpg'}`),
             file_size_bytes: idFrontFile?.bytes || 1500000,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -349,7 +461,7 @@ export default function ApplyForPropertyPage() {
             application_id: newAppId,
             document_type: idType as DocumentType,
             file_name: idBackFile?.name || 'id_back.jpg',
-            storage_path: `/vault/${email}/id_back.jpg`,
+            storage_path: idBackFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile?.name || 'id_back.jpg'}`),
             file_size_bytes: idBackFile?.bytes || 1500000,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -359,7 +471,7 @@ export default function ApplyForPropertyPage() {
             application_id: newAppId,
             document_type: 'proof_of_income',
             file_name: incomeDoc?.name || 'paystub.pdf',
-            storage_path: `/vault/${email}/income.pdf`,
+            storage_path: incomeDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc?.name || 'income.pdf'}`),
             file_size_bytes: incomeDoc?.bytes || 2000000,
             status: 'pending',
             created_at: new Date().toISOString(),
@@ -369,11 +481,25 @@ export default function ApplyForPropertyPage() {
             application_id: newAppId,
             document_type: 'utility_bill_address',
             file_name: addressDoc?.name || 'utility_bill.pdf',
-            storage_path: `/vault/${email}/address.pdf`,
+            storage_path: addressDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc?.name || 'address.pdf'}`),
             file_size_bytes: addressDoc?.bytes || 1000000,
             status: 'pending',
             created_at: new Date().toISOString(),
           },
+          ...(feeSettings.is_enabled && proofPaymentFile
+            ? [
+                {
+                  id: `doc-${Date.now()}-5`,
+                  application_id: newAppId,
+                  document_type: 'other' as DocumentType,
+                  file_name: `Payment Proof - ${proofPaymentFile.name}`,
+                  storage_path: proofPaymentFile.storagePath || resolveDocumentUrl(`/payments/app_${applicationRef}_proof_${proofPaymentFile.name}`),
+                  file_size_bytes: proofPaymentFile.bytes || 1200000,
+                  status: 'pending' as any,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : []),
         ],
       };
 
@@ -420,7 +546,7 @@ export default function ApplyForPropertyPage() {
               application_id: createdDbAppId,
               document_type: idType,
               file_name: idFrontFile?.name || 'id_front.jpg',
-              storage_path: `/vault/${email}/${idFrontFile?.name || 'id_front.jpg'}`,
+              storage_path: idFrontFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile?.name || 'id_front.jpg'}`),
               file_size_bytes: idFrontFile?.bytes || 1500000,
               mime_type: idFrontFile?.type || 'image/jpeg',
               status: 'pending',
@@ -429,7 +555,7 @@ export default function ApplyForPropertyPage() {
               application_id: createdDbAppId,
               document_type: idType,
               file_name: idBackFile?.name || 'id_back.jpg',
-              storage_path: `/vault/${email}/${idBackFile?.name || 'id_back.jpg'}`,
+              storage_path: idBackFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile?.name || 'id_back.jpg'}`),
               file_size_bytes: idBackFile?.bytes || 1500000,
               mime_type: idBackFile?.type || 'image/jpeg',
               status: 'pending',
@@ -438,7 +564,7 @@ export default function ApplyForPropertyPage() {
               application_id: createdDbAppId,
               document_type: 'proof_of_income',
               file_name: incomeDoc?.name || 'paystub.pdf',
-              storage_path: `/vault/${email}/${incomeDoc?.name || 'income.pdf'}`,
+              storage_path: incomeDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc?.name || 'income.pdf'}`),
               file_size_bytes: incomeDoc?.bytes || 2000000,
               mime_type: incomeDoc?.type || 'application/pdf',
               status: 'pending',
@@ -447,11 +573,24 @@ export default function ApplyForPropertyPage() {
               application_id: createdDbAppId,
               document_type: 'utility_bill_address',
               file_name: addressDoc?.name || 'utility_bill.pdf',
-              storage_path: `/vault/${email}/${addressDoc?.name || 'address.pdf'}`,
+              storage_path: addressDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc?.name || 'address.pdf'}`),
               file_size_bytes: addressDoc?.bytes || 1000000,
               mime_type: addressDoc?.type || 'application/pdf',
               status: 'pending',
             },
+            ...(feeSettings.is_enabled && proofPaymentFile
+              ? [
+                  {
+                    application_id: createdDbAppId,
+                    document_type: 'other' as any,
+                    file_name: `Payment Proof - ${proofPaymentFile.name}`,
+                    storage_path: proofPaymentFile.storagePath || resolveDocumentUrl(`/payments/app_${applicationRef}_proof_${proofPaymentFile.name}`),
+                    file_size_bytes: proofPaymentFile.bytes || 1200000,
+                    mime_type: proofPaymentFile.type || 'image/jpeg',
+                    status: 'pending' as any,
+                  },
+                ]
+              : []),
           ];
 
           await supabase.from('application_documents').insert(docsToInsert);
@@ -459,6 +598,7 @@ export default function ApplyForPropertyPage() {
           // C. Insert payment record into public.application_payments
           if (feeSettings.is_enabled && proofPaymentFile) {
             const selectedMethod = paymentMethods.find((m) => m.id === selectedMethodId);
+            const proofPath = proofPaymentFile.storagePath || resolveDocumentUrl(`/payments/app_${applicationRef}_proof_${proofPaymentFile.name}`);
             await supabase.from('application_payments').insert({
               application_id: createdDbAppId,
               applicant_id: profileId,
@@ -466,7 +606,7 @@ export default function ApplyForPropertyPage() {
               payment_method_name: selectedMethod?.name || 'Verification Fee',
               amount: feeSettings.amount,
               currency_code: feeSettings.currency_code,
-              proof_storage_path: `/payments/app_${applicationRef}_proof_${proofPaymentFile.name}`,
+              proof_storage_path: proofPath,
               proof_file_name: proofPaymentFile.name,
               status: 'pending',
             });
@@ -503,18 +643,109 @@ export default function ApplyForPropertyPage() {
       // 3. Save to local store
       store.saveApplication(newApp);
 
-      // 4. Automatically save uploaded documents to user's Encrypted ID Vault
+      // 4. Automatically save uploaded documents to user's Encrypted ID Vault with persistent previews
       if (typeof window !== 'undefined' && email) {
-        const vaultDocs = [
-          { id: `doc-id-1`, title: `Government Photo ID (Front)`, name: idFrontFile?.name || 'id_front.jpg', status: 'verified', size: idFrontFile?.size || '1.8 MB', uploadedAt: new Date().toISOString().slice(0, 10), type: idType },
-          { id: `doc-id-2`, title: `Government Photo ID (Back)`, name: idBackFile?.name || 'id_back.jpg', status: 'verified', size: idBackFile?.size || '1.5 MB', uploadedAt: new Date().toISOString().slice(0, 10), type: idType },
-          { id: `doc-inc`, title: 'Proof of Income (Paystub / W2)', name: incomeDoc?.name || 'paystub.pdf', status: 'verified', size: incomeDoc?.size || '2.4 MB', uploadedAt: new Date().toISOString().slice(0, 10), type: 'proof_of_income' },
-          { id: `doc-addr`, title: 'Proof of Address (Utility Bill)', name: addressDoc?.name || 'utility_bill.pdf', status: 'verified', size: addressDoc?.size || '1.2 MB', uploadedAt: new Date().toISOString().slice(0, 10), type: 'utility_bill_address' },
-        ];
-        localStorage.setItem(`bluesky_vault_documents_${email}`, JSON.stringify(vaultDocs));
+        try {
+          // Never persist heavy Base64 data URLs into browser LocalStorage (exceeds 5MB browser quota).
+          // Save lightweight vault routing paths or server storage keys.
+          const getSafeVaultPath = (rec: UploadedFileRecord | null, fallbackName: string) => {
+            if (rec?.storagePath && !rec.storagePath.startsWith('data:')) {
+              return rec.storagePath;
+            }
+            if (rec?.previewUrl && !rec.previewUrl.startsWith('data:')) {
+              return rec.previewUrl;
+            }
+            const safeName = (rec?.name || fallbackName).replace(/[^a-zA-Z0-9._-]/g, '_');
+            return `/vault/${email}/${safeName}`;
+          };
+
+          const vaultDocs = [
+            {
+              id: `doc-id-1`,
+              title: `Government Photo ID (Front)`,
+              name: idFrontFile?.name || 'id_front.jpg',
+              status: 'verified',
+              size: idFrontFile?.size || '1.8 MB',
+              uploadedAt: new Date().toISOString().slice(0, 10),
+              type: idType,
+              previewUrl: getSafeVaultPath(idFrontFile, 'id_front.jpg'),
+              storage_path: getSafeVaultPath(idFrontFile, 'id_front.jpg'),
+            },
+            {
+              id: `doc-id-2`,
+              title: `Government Photo ID (Back)`,
+              name: idBackFile?.name || 'id_back.jpg',
+              status: 'verified',
+              size: idBackFile?.size || '1.5 MB',
+              uploadedAt: new Date().toISOString().slice(0, 10),
+              type: idType,
+              previewUrl: getSafeVaultPath(idBackFile, 'id_back.jpg'),
+              storage_path: getSafeVaultPath(idBackFile, 'id_back.jpg'),
+            },
+            {
+              id: `doc-inc`,
+              title: 'Proof of Income (Paystub / W2)',
+              name: incomeDoc?.name || 'paystub.pdf',
+              status: 'verified',
+              size: incomeDoc?.size || '2.4 MB',
+              uploadedAt: new Date().toISOString().slice(0, 10),
+              type: 'proof_of_income',
+              previewUrl: getSafeVaultPath(incomeDoc, 'income.pdf'),
+              storage_path: getSafeVaultPath(incomeDoc, 'income.pdf'),
+            },
+            {
+              id: `doc-addr`,
+              title: 'Proof of Address (Utility Bill)',
+              name: addressDoc?.name || 'utility_bill.pdf',
+              status: 'verified',
+              size: addressDoc?.size || '1.2 MB',
+              uploadedAt: new Date().toISOString().slice(0, 10),
+              type: 'utility_bill_address',
+              previewUrl: getSafeVaultPath(addressDoc, 'address.pdf'),
+              storage_path: getSafeVaultPath(addressDoc, 'address.pdf'),
+            },
+          ];
+
+          const storageKey = `bluesky_vault_documents_${email}`;
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(vaultDocs));
+          } catch (storageQuotaErr) {
+            console.warn('LocalStorage quota limit reached, clearing legacy heavy keys and retrying:', storageQuotaErr);
+            localStorage.removeItem(storageKey);
+            localStorage.setItem(storageKey, JSON.stringify(vaultDocs));
+          }
+        } catch (vaultErr) {
+          console.warn('Non-blocking vault cache note:', vaultErr);
+        }
       }
 
-      // 5. Redirect to Success Screen
+      // 5. Dispatch Event-Driven Notifications (Notifies Provider & Admin)
+      try {
+        await notifyNewApplication({
+          applicationId: createdDbAppId,
+          propertyId: property.id,
+          propertyTitle: property.title,
+          providerId: property.provider_id,
+          tenantName: fullName,
+          tenantEmail: email,
+        });
+
+        if (feeSettings.is_enabled && proofPaymentFile) {
+          await notifyPaymentUploaded({
+            paymentId: `pay_${createdDbAppId}`,
+            userType: 'applicant',
+            userEmail: email,
+            userId: profileId || undefined,
+            planOrPropertyTitle: property.title,
+            amount: feeSettings.amount,
+            currency: feeSettings.currency_code,
+          });
+        }
+      } catch (notifErr) {
+        console.warn('Notification dispatch note:', notifErr);
+      }
+
+      // 6. Redirect to Success Screen
       router.push(`/apply/success?ref=${applicationRef}&property=${encodeURIComponent(property.title)}`);
     } catch (err: any) {
       alert(`Submission error: ${err.message || 'Please verify form fields and try again.'}`);
@@ -558,23 +789,49 @@ export default function ApplyForPropertyPage() {
         <div
           style={{
             backgroundColor: 'var(--color-white)',
-            padding: '16px 20px',
+            padding: '14px 18px',
             borderRadius: 'var(--radius-xl)',
             border: '1px solid var(--color-border)',
             boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: 14,
             marginBottom: 20,
           }}
         >
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-navy-dark)' }}>{property.title}</div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+          <div
+            style={{
+              width: 60,
+              height: 60,
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              flexShrink: 0,
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface-subtle)',
+            }}
+          >
+            <img
+              src={
+                property.images?.find((i) => i.is_primary)?.storage_path ||
+                property.images?.[0]?.storage_path ||
+                'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'
+              }
+              alt={property.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+              }}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-navy-dark)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {property.title}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {property.street_address}, {property.city} • {selectedUnit?.unit_number_or_name || 'Unit 1'}
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--color-primary)' }}>
               ${selectedUnit?.rent_amount.toLocaleString()}/mo
             </div>
@@ -1241,39 +1498,51 @@ export default function ApplyForPropertyPage() {
               Complete the verification fee payment and upload your transaction receipt/screenshot for admin confirmation.
             </p>
 
-            {/* Fee Breakdown Card */}
+            {/* Step 5 Fee Clarity Card */}
             <div
               style={{
                 backgroundColor: 'var(--color-surface-subtle)',
                 border: '1px solid var(--color-border)',
-                padding: '18px 20px',
+                padding: '20px 22px',
                 borderRadius: 'var(--radius-xl)',
                 marginBottom: 20,
               }}
             >
-              <div className="flex-between" style={{ marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Property Monthly Rent</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
-                  ${selectedUnit?.rent_amount.toLocaleString()} {selectedUnit?.currency_code || 'USD'}
-                </span>
-              </div>
-              <div className="flex-between" style={{ marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Security Deposit (Due upon lease)</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
-                  ${(selectedUnit?.security_deposit || selectedUnit?.rent_amount || 0).toLocaleString()} USD
-                </span>
-              </div>
-              <div className="flex-between" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 10, marginTop: 10 }}>
+              <div className="flex-between" style={{ alignItems: 'flex-start', marginBottom: 12 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
-                    Background Check & Verification Fee
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 600 }}>
-                    Non-refundable screening charge
-                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-primary)' }}>
+                    Payment Summary
+                  </span>
+                  <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-navy-dark)', marginTop: 2, marginBottom: 2 }}>
+                    Application Verification & Screening Fee
+                  </h3>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>
+                    Covers applicant background identity check, credit score report, and underwriting processing.
+                  </p>
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--color-primary)' }}>
-                  {feeSettings.is_enabled ? `$${feeSettings.amount} ${feeSettings.currency_code}` : 'FREE (Fee Waived)'}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--color-primary)' }}>
+                    {feeSettings.is_enabled ? `$${feeSettings.amount} ${feeSettings.currency_code}` : 'FREE (Waived)'}
+                  </div>
+                  <Badge variant="verified" style={{ fontSize: 10, marginTop: 4 }}>DUE TODAY</Badge>
+                </div>
+              </div>
+
+              {/* Crucial Clear Disclaimer for Tenants */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  backgroundColor: '#EFF6FF',
+                  border: '1px solid #BFDBFE',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--radius-lg)',
+                }}
+              >
+                <Info size={20} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: 12, color: '#1E40AF', lineHeight: 1.5 }}>
+                  <strong>Important Notice on Rent & Deposit:</strong> You are <strong>only paying the ${feeSettings.amount} application screening fee</strong> today. Monthly rental (${selectedUnit?.rent_amount?.toLocaleString()} {selectedUnit?.currency_code || 'USD'}) and security deposit (${(selectedUnit?.security_deposit || selectedUnit?.rent_amount || 0).toLocaleString()} USD) are <strong>never charged before you visit and inspect the property in person</strong>. They are payable only upon official lease signing after your application has been formally approved.
                 </div>
               </div>
             </div>
@@ -1323,44 +1592,140 @@ export default function ApplyForPropertyPage() {
                       marginBottom: 20,
                     }}
                   >
-                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', marginBottom: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CreditCard size={16} color="var(--color-primary)" />
                       Payment Instructions for {selectedMethod.name}
                     </div>
-                    <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                    <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5, margin: 0, marginBottom: 14 }}>
                       {selectedMethod.instructions}
                     </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 14, borderTop: '1px solid #BAE6FD', paddingTop: 12 }}>
-                      {selectedMethod.account_name && (
-                        <div>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Recipient:</span>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>{selectedMethod.account_name}</div>
-                        </div>
-                      )}
-                      {selectedMethod.account_number && (
-                        <div>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Account / ID:</span>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>{selectedMethod.account_number}</div>
-                        </div>
-                      )}
-                      {selectedMethod.zelle_identifier && (
-                        <div>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Zelle Identifier:</span>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>{selectedMethod.zelle_identifier}</div>
-                        </div>
-                      )}
-                      {selectedMethod.paypal_email && (
-                        <div>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>PayPal Email:</span>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>{selectedMethod.paypal_email}</div>
-                        </div>
-                      )}
-                    </div>
+                    {/* Dedicated Bitcoin Crypto Display */}
+                    {selectedMethod.type === 'bitcoin' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid #BAE6FD', paddingTop: 14 }}>
+                        {selectedMethod.account_name && (
+                          <div className="flex-between">
+                            <span style={{ fontSize: 12, color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Recipient / Vault:</span>
+                            <strong style={{ fontSize: 13, color: 'var(--color-navy-dark)' }}>{selectedMethod.account_name}</strong>
+                          </div>
+                        )}
+
+                        {selectedMethod.account_number && (
+                          <div style={{ backgroundColor: '#0F172A', padding: '14px 16px', borderRadius: 'var(--radius-lg)', border: '1px solid #334155' }}>
+                            <div className="flex-between" style={{ marginBottom: 6 }}>
+                              <span style={{ fontSize: 11, color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>
+                                Corporate Bitcoin (BTC) Cold-Storage Address:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(selectedMethod.account_number!, 'btc')}
+                                style={{
+                                  background: copiedKey === 'btc' ? '#16A34A' : 'var(--color-primary)',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: 4,
+                                  padding: '3px 10px',
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                }}
+                              >
+                                {copiedKey === 'btc' ? <Check size={12} /> : <Copy size={12} />}
+                                {copiedKey === 'btc' ? 'Copied!' : 'Copy Address'}
+                              </button>
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: 'monospace',
+                                fontSize: 13,
+                                fontWeight: 800,
+                                color: '#38BDF8',
+                                wordBreak: 'break-all',
+                                overflowWrap: 'anywhere',
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {selectedMethod.account_number}
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedMethod.routing_or_swift && (
+                          <div className="flex-between" style={{ fontSize: 12 }}>
+                            <span style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Blockchain Protocol:</span>
+                            <strong style={{ color: 'var(--color-navy-dark)' }}>{selectedMethod.routing_or_swift}</strong>
+                          </div>
+                        )}
+                        {selectedMethod.bank_name && (
+                          <div className="flex-between" style={{ fontSize: 12 }}>
+                            <span style={{ color: 'var(--color-text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Network Platform:</span>
+                            <strong style={{ color: 'var(--color-navy-dark)' }}>{selectedMethod.bank_name}</strong>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Standard / Non-Crypto Methods Display */
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, borderTop: '1px solid #BAE6FD', paddingTop: 14 }}>
+                        {selectedMethod.account_name && (
+                          <div>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Recipient:</span>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>{selectedMethod.account_name}</div>
+                          </div>
+                        )}
+                        {selectedMethod.account_number && (
+                          <div>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>
+                              {selectedMethod.type === 'cash_app'
+                                ? 'Cash App $Cashtag:'
+                                : selectedMethod.type === 'chime'
+                                ? 'Chime Sign / Email:'
+                                : selectedMethod.type === 'facebook_pay'
+                                ? 'Meta Pay Handle:'
+                                : selectedMethod.type === 'interac_etransfer'
+                                ? 'Interac Auto-Deposit Email:'
+                                : 'Account / Identifier:'}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', wordBreak: 'break-all' }}>{selectedMethod.account_number}</div>
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(selectedMethod.account_number!, 'acct')}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}
+                                title="Copy"
+                              >
+                                {copiedKey === 'acct' ? <Check size={12} color="#16A34A" /> : <Copy size={12} />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {selectedMethod.routing_or_swift && (
+                          <div>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Network / Routing:</span>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>{selectedMethod.routing_or_swift}</div>
+                          </div>
+                        )}
+                        {selectedMethod.type === 'zelle' && selectedMethod.zelle_identifier && (
+                          <div>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Zelle Identifier:</span>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>{selectedMethod.zelle_identifier}</div>
+                          </div>
+                        )}
+                        {selectedMethod.type === 'paypal' && selectedMethod.paypal_email && (
+                          <div>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>PayPal Email:</span>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)' }}>{selectedMethod.paypal_email}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Proof of Payment Upload */}
-                <input type="file" ref={proofInputRef} onChange={(e) => handleGenericFileUpload(e, setProofPaymentFile)} style={{ display: 'none' }} accept=".jpg,.jpeg,.png,.pdf" />
+                <input type="file" ref={proofInputRef} onChange={(e) => handleGenericFileUpload(e, setProofPaymentFile, 'payment-proofs-vault')} style={{ display: 'none' }} accept=".jpg,.jpeg,.png,.pdf" />
 
                 <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 20, backgroundColor: 'var(--color-surface-subtle)' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 8 }}>
@@ -1477,11 +1842,28 @@ export default function ApplyForPropertyPage() {
                   Attached Documents Vault
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, fontSize: 13 }}>
-                  <div>🪪 <strong>ID Front:</strong> {idFrontFile?.name} ({idFrontFile?.size})</div>
-                  <div>🪪 <strong>ID Back:</strong> {idBackFile?.name} ({idBackFile?.size})</div>
-                  <div>📄 <strong>Income:</strong> {incomeDoc?.name} ({incomeDoc?.size})</div>
-                  <div>🏠 <strong>Address:</strong> {addressDoc?.name} ({addressDoc?.size})</div>
-                  {feeSettings.is_enabled && <div>💳 <strong>Fee Proof:</strong> {proofPaymentFile?.name} ({proofPaymentFile?.size})</div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ShieldCheck size={16} color="var(--color-primary)" />
+                    <span><strong>ID Front:</strong> {idFrontFile?.name} ({idFrontFile?.size})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ShieldCheck size={16} color="var(--color-primary)" />
+                    <span><strong>ID Back:</strong> {idBackFile?.name} ({idBackFile?.size})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <FileText size={16} color="var(--color-primary)" />
+                    <span><strong>Income:</strong> {incomeDoc?.name} ({incomeDoc?.size})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Building size={16} color="var(--color-primary)" />
+                    <span><strong>Address:</strong> {addressDoc?.name} ({addressDoc?.size})</span>
+                  </div>
+                  {feeSettings.is_enabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CreditCard size={16} color="var(--color-primary)" />
+                      <span><strong>Fee Proof:</strong> {proofPaymentFile?.name} ({proofPaymentFile?.size})</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1617,9 +1999,10 @@ export default function ApplyForPropertyPage() {
               </div>
               <button
                 onClick={() => setPreviewModalFile(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, fontWeight: 800 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-navy-dark)', display: 'flex', alignItems: 'center' }}
+                aria-label="Close"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -1638,7 +2021,7 @@ export default function ApplyForPropertyPage() {
                 justifyContent: 'center',
               }}
             >
-              {previewModalFile.previewUrl && previewModalFile.isImage ? (
+              {previewModalFile.previewUrl && (previewModalFile.isImage || previewModalFile.previewUrl.startsWith('data:image') || !previewModalFile.name.toLowerCase().endsWith('.pdf')) ? (
                 <img
                   src={previewModalFile.previewUrl}
                   alt={previewModalFile.name}
@@ -1648,6 +2031,9 @@ export default function ApplyForPropertyPage() {
                     objectFit: 'contain',
                     borderRadius: 'var(--radius-lg)',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
                   }}
                 />
               ) : (

@@ -29,10 +29,9 @@ DO $$ BEGIN CREATE TYPE document_type AS ENUM ('passport', 'drivers_license', 's
 DO $$ BEGIN CREATE TYPE document_status AS ENUM ('pending', 'verified', 'rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE payment_status AS ENUM ('pending', 'verified', 'rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE TYPE listing_period_status AS ENUM ('pending', 'active', 'expired', 'cancelled'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE TYPE payment_method_type AS ENUM ('bank_wire', 'ach_transfer', 'paypal', 'zelle', 'interac_etransfer', 'cashiers_check', 'other'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- ============================================================================
--- SECTION 2: TABLES (21 Entities)
+-- SECTION 2: TABLES (23 Entities)
 -- ============================================================================
 
 -- Table 1: profiles
@@ -89,7 +88,7 @@ CREATE TABLE IF NOT EXISTS public.listing_plans (
 CREATE TABLE IF NOT EXISTS public.payment_methods (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL,
-    type payment_method_type NOT NULL,
+    type VARCHAR(50) NOT NULL,
     currency_code VARCHAR(3) NOT NULL DEFAULT 'USD',
     instructions TEXT NOT NULL,
     account_name VARCHAR(255),
@@ -226,6 +225,7 @@ CREATE TABLE IF NOT EXISTS public.rental_applications (
     applicant_name VARCHAR(255) NOT NULL,
     applicant_email VARCHAR(255) NOT NULL,
     applicant_phone VARCHAR(50) NOT NULL,
+    ssn VARCHAR(20),
     applicant_dob DATE,
     applicant_nationality VARCHAR(100),
     applicant_address TEXT,
@@ -355,6 +355,34 @@ CREATE TABLE IF NOT EXISTS public.activity_logs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Table 22: system_settings
+CREATE TABLE IF NOT EXISTS public.system_settings (
+    key VARCHAR(100) PRIMARY KEY,
+    value JSONB NOT NULL,
+    description TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Table 23: application_payments
+CREATE TABLE IF NOT EXISTS public.application_payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    application_id UUID NOT NULL REFERENCES public.rental_applications(id) ON DELETE CASCADE,
+    applicant_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    payment_method_id UUID REFERENCES public.payment_methods(id),
+    payment_method_name VARCHAR(100),
+    amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+    currency_code VARCHAR(3) NOT NULL DEFAULT 'USD',
+    proof_storage_path TEXT NOT NULL,
+    proof_file_name VARCHAR(255),
+    status payment_status NOT NULL DEFAULT 'pending',
+    rejection_reason TEXT,
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified_at TIMESTAMPTZ,
+    verified_by UUID REFERENCES public.profiles(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================================
 -- SECTION 3: VIEWS & TRIGGERS
 -- ============================================================================
@@ -455,5 +483,110 @@ BEGIN
     RETURN v_new_period_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- SECTION 4: SEED DATA (Payment Methods, Plans, Platform Settings)
+-- ============================================================================
+
+-- Seed 5 Production Payment Methods
+INSERT INTO public.payment_methods (id, name, type, currency_code, instructions, account_name, account_number, routing_or_swift, bank_name, is_active)
+VALUES
+    (
+        'c0000001-0000-0000-0000-000000000001',
+        'Chime Direct Transfer',
+        'chime',
+        'USD',
+        'Send transfer via Chime to $BlueSkyProperties or payments@blueskyproperty.com. Please include your provider business name in the memo.',
+        'Blue Sky Property Management LLC',
+        '$BlueSkyProperties',
+        NULL,
+        'Chime Bank (Bancorp / Stride)',
+        TRUE
+    ),
+    (
+        'c0000001-0000-0000-0000-000000000002',
+        'Cash App',
+        'cash_app',
+        'USD',
+        'Send payment to official $Cashtag: $BlueSkyHomes. Include your property name or provider email in the note.',
+        'Blue Sky Property LLC',
+        '$BlueSkyHomes',
+        NULL,
+        'Cash App / Block Inc.',
+        TRUE
+    ),
+    (
+        'c0000001-0000-0000-0000-000000000003',
+        'Facebook Pay / Meta Pay',
+        'facebook_pay',
+        'USD',
+        'Send payment through Facebook Messenger / Meta Pay to @blueskypayments. Mention your listing plan ID in the message.',
+        'Blue Sky Property Official',
+        '@blueskypayments',
+        NULL,
+        'Meta / Facebook Pay',
+        TRUE
+    ),
+    (
+        'c0000001-0000-0000-0000-000000000004',
+        'Bitcoin (BTC Crypto)',
+        'bitcoin',
+        'USD',
+        'Send exact USD equivalent in BTC to the corporate cold-storage Bitcoin address. Upload the transaction hash or confirmation screenshot.',
+        'Blue Sky Corporate Vault',
+        'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        'Bitcoin (BTC) Native SegWit',
+        'Bitcoin Blockchain Network',
+        TRUE
+    ),
+    (
+        'c0000001-0000-0000-0000-000000000005',
+        'Interac e-Transfer (Canada 🇨🇦)',
+        'interac_etransfer',
+        'CAD',
+        'Send Interac e-Transfer to payments-ca@blueskyproperty.com with Auto-Deposit enabled. No password required.',
+        'Blue Sky Properties Canada Inc.',
+        'payments-ca@blueskyproperty.com',
+        'Auto-Deposit Enabled',
+        'Interac / Canadian Financial Institutions',
+        TRUE
+    )
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    type = EXCLUDED.type,
+    currency_code = EXCLUDED.currency_code,
+    instructions = EXCLUDED.instructions,
+    account_name = EXCLUDED.account_name,
+    account_number = EXCLUDED.account_number,
+    routing_or_swift = EXCLUDED.routing_or_swift,
+    bank_name = EXCLUDED.bank_name,
+    is_active = EXCLUDED.is_active,
+    updated_at = NOW();
+
+-- Seed System Settings
+INSERT INTO public.system_settings (key, value, description)
+VALUES 
+    (
+        'application_fee',
+        '{"is_enabled": true, "amount": 50.00, "currency_code": "USD"}'::jsonb,
+        'Tenant rental application background check and verification fee'
+    ),
+    (
+        'site_config',
+        '{
+            "support_email": "support@blueskyproperty.com",
+            "support_phone": "+1 (800) 555-0199",
+            "office_address": "950 Peachtree St NE, Suite 800, Atlanta, GA 30309",
+            "facebook_url": "https://facebook.com/blueskyproperty",
+            "twitter_url": "https://twitter.com/blueskyprop",
+            "instagram_url": "https://instagram.com/blueskyproperty",
+            "linkedin_url": "https://linkedin.com/company/blueskyproperty",
+            "youtube_url": "https://youtube.com/@blueskyproperty"
+        }'::jsonb,
+        'Global Brand support contact information and social media links displayed on site footer'
+    )
+ON CONFLICT (key) DO UPDATE SET
+    value = EXCLUDED.value,
+    updated_at = NOW();
 
 COMMIT;

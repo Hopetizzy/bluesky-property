@@ -1,6 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Shield, Upload, FileText, CheckCircle2, Eye, Trash2, Loader2, Plus, AlertCircle, Check } from 'lucide-react';
+import {
+  ArrowLeft,
+  Shield,
+  Upload,
+  FileText,
+  CheckCircle2,
+  Eye,
+  Trash2,
+  Loader2,
+  Plus,
+  AlertCircle,
+  Check,
+  ExternalLink,
+  X,
+  Lock,
+  Download,
+  FileCheck,
+  ShieldCheck,
+} from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
@@ -13,6 +31,22 @@ interface VaultDocument {
   size: string;
   uploadedAt: string;
   type: string;
+  storage_path?: string;
+  previewUrl?: string;
+}
+
+function resolveDocumentUrl(pathOrUrl?: string, defaultName?: string): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://') || pathOrUrl.startsWith('data:')) {
+    return pathOrUrl;
+  }
+  if (pathOrUrl.startsWith('/vault/')) {
+    return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
+  }
+  if (pathOrUrl.startsWith('/payments/')) {
+    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
+  }
+  return `/api/vault/view?path=${encodeURIComponent(pathOrUrl)}`;
 }
 
 export default function DocumentVaultPage() {
@@ -24,6 +58,8 @@ export default function DocumentVaultPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedDocType, setSelectedDocType] = useState('passport');
+  const [previewDoc, setPreviewDoc] = useState<VaultDocument | null>(null);
+  const [modalImgFailed, setModalImgFailed] = useState(false);
 
   useEffect(() => {
     async function loadDocs() {
@@ -59,15 +95,21 @@ export default function DocumentVaultPage() {
                   .order('created_at', { ascending: false });
 
                 if (dbDocs && dbDocs.length > 0) {
-                  userDocs = dbDocs.map((d: any) => ({
-                    id: String(d.id),
-                    title: (d.document_type || 'document').replace(/_/g, ' ').toUpperCase(),
-                    name: d.file_name || 'document_file.pdf',
-                    status: d.status || 'pending',
-                    size: d.file_size_bytes ? `${(d.file_size_bytes / (1024 * 1024)).toFixed(1)} MB` : '1.5 MB',
-                    uploadedAt: (d.created_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
-                    type: d.document_type || 'other',
-                  }));
+                  userDocs = dbDocs.map((d: any) => {
+                    const stPath = d.storage_path || '';
+                    const preview = resolveDocumentUrl(stPath, d.file_name);
+                    return {
+                      id: String(d.id),
+                      title: (d.document_type || 'document').replace(/_/g, ' ').toUpperCase(),
+                      name: d.file_name || 'document_file.pdf',
+                      status: d.status || 'pending',
+                      size: d.file_size_bytes ? `${(d.file_size_bytes / (1024 * 1024)).toFixed(1)} MB` : '1.5 MB',
+                      uploadedAt: (d.created_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+                      type: d.document_type || 'other',
+                      storage_path: stPath,
+                      previewUrl: preview,
+                    };
+                  });
                 }
               }
             }
@@ -81,7 +123,15 @@ export default function DocumentVaultPage() {
           if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              userDocs = parsed;
+              userDocs = parsed.map((d: any) => {
+                const stPath = d.storage_path || `/vault/${email}/${d.name}`;
+                const preview = d.previewUrl || resolveDocumentUrl(stPath, d.name);
+                return {
+                  ...d,
+                  storage_path: stPath,
+                  previewUrl: preview,
+                };
+              });
             }
           }
         }
@@ -101,8 +151,28 @@ export default function DocumentVaultPage() {
   const saveDocsState = (docs: VaultDocument[]) => {
     setDocuments(docs);
     if (typeof window !== 'undefined') {
-      const storageKey = userEmail ? `bluesky_vault_documents_${userEmail}` : 'bluesky_vault_documents';
-      localStorage.setItem(storageKey, JSON.stringify(docs));
+      try {
+        const storageKey = userEmail ? `bluesky_vault_documents_${userEmail}` : 'bluesky_vault_documents';
+        const sanitized = docs.map((doc) => {
+          let preview = doc.previewUrl;
+          if (preview && preview.startsWith('data:')) {
+            preview = doc.storage_path || resolveDocumentUrl(doc.storage_path, doc.name);
+          }
+          return {
+            ...doc,
+            previewUrl: preview,
+          };
+        });
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(sanitized));
+        } catch (quotaErr) {
+          console.warn('LocalStorage quota reached in saveDocsState, retrying after cleanup:', quotaErr);
+          localStorage.removeItem(storageKey);
+          localStorage.setItem(storageKey, JSON.stringify(sanitized));
+        }
+      } catch (err) {
+        console.warn('saveDocsState non-blocking note:', err);
+      }
     }
   };
 
@@ -117,6 +187,37 @@ export default function DocumentVaultPage() {
       const fileName = file.name;
       const fileSize = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
 
+      // Read as Data URL
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      let storagePath = `/vault/${userEmail || 'client'}/${fileName}`;
+      let previewUrl = dataUrl;
+
+      try {
+        const res = await fetch('/api/vault/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName,
+            fileData: dataUrl,
+            bucket: 'applicant-vault',
+            folder: userEmail ? `vault_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'vault',
+          }),
+        });
+        const json = await res.json();
+        if (json.success && json.storage_path) {
+          storagePath = json.storage_path;
+          previewUrl = json.preview_url || dataUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('Vault upload background sync note:', uploadErr);
+      }
+
       const newDoc: VaultDocument = {
         id: `doc-${Date.now()}`,
         title: selectedDocType.replace(/_/g, ' ').toUpperCase(),
@@ -125,6 +226,8 @@ export default function DocumentVaultPage() {
         size: fileSize,
         uploadedAt: new Date().toISOString().slice(0, 10),
         type: selectedDocType,
+        storage_path: storagePath,
+        previewUrl: previewUrl,
       };
 
       const updated = [newDoc, ...documents];
@@ -286,7 +389,13 @@ export default function DocumentVaultPage() {
                     <div className="flex-between" style={{ borderTop: '1px solid var(--color-surface-subtle)', paddingTop: 10 }}>
                       <button
                         type="button"
-                        onClick={() => alert(`Encrypted file preview: ${doc.name}`)}
+                        onClick={() => {
+                          setModalImgFailed(false);
+                          setPreviewDoc({
+                            ...doc,
+                            previewUrl: resolveDocumentUrl(doc.storage_path || doc.previewUrl, doc.name),
+                          });
+                        }}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -389,11 +498,133 @@ export default function DocumentVaultPage() {
               </p>
             </div>
 
-            <div style={{ marginTop: 16, fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
-              🔒 Documents are protected under end-to-end access policies. They will automatically be attached to any new property application you submit.
+            <div style={{ marginTop: 16, fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Lock size={13} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+              <span>Documents are protected under end-to-end access policies. They will automatically be attached to any new property application you submit.</span>
             </div>
           </div>
         </div>
+
+        {/* Interactive Document Preview Modal */}
+        {previewDoc && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: 16,
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={() => {
+              setPreviewDoc(null);
+              setModalImgFailed(false);
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 'var(--radius-2xl)',
+                padding: 24,
+                maxWidth: 620,
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: 'var(--shadow-modal)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex-between" style={{ marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
+                    {previewDoc.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                    {previewDoc.name} • {previewDoc.size}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewDoc(null);
+                    setModalImgFailed(false);
+                  }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-navy-dark)' }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#0F172A',
+                  borderRadius: 'var(--radius-xl)',
+                  padding: 16,
+                  textAlign: 'center',
+                  border: '1px solid #334155',
+                  marginBottom: 16,
+                  minHeight: 260,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {!modalImgFailed && previewDoc.previewUrl && !previewDoc.name.toLowerCase().endsWith('.pdf') ? (
+                  <img
+                    src={previewDoc.previewUrl}
+                    alt={previewDoc.name}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: 380,
+                      objectFit: 'contain',
+                      borderRadius: 8,
+                    }}
+                    onError={() => setModalImgFailed(true)}
+                  />
+                ) : (
+                  <div style={{ padding: 24, textAlign: 'center' }}>
+                    <FileText size={56} color="#38BDF8" style={{ margin: '0 auto 12px auto' }} />
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#F8FAFC' }}>{previewDoc.name}</div>
+                    <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 4 }}>
+                      {previewDoc.title} • {previewDoc.size}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#38BDF8', marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: 'rgba(2, 132, 199, 0.15)', padding: '6px 14px', borderRadius: 20, border: '1px solid #0284C7' }}>
+                      <Lock size={12} /> Stored in Encrypted Underwriting Vault
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                {previewDoc.previewUrl && (
+                  <a
+                    href={previewDoc.previewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-secondary"
+                    style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13, textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={14} /> Open Full Document
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(null)}
+                  className="btn btn-primary"
+                  style={{ flex: 1, fontSize: 13 }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

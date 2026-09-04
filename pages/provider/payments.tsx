@@ -26,6 +26,29 @@ import { ProviderPayment, ProviderListingPeriod, PaymentStatus } from '@/lib/typ
 
 type PaymentFilterTab = 'all' | 'verified' | 'pending' | 'rejected';
 
+function resolveDocumentUrl(pathOrUrl?: string): string {
+  if (!pathOrUrl) return '';
+  if (pathOrUrl.startsWith('data:') || (pathOrUrl.startsWith('http') && pathOrUrl.includes('token='))) {
+    return pathOrUrl;
+  }
+  if (pathOrUrl.includes('supabase.co/storage') && !pathOrUrl.includes('token=')) {
+    const match = pathOrUrl.match(/\/payment-proofs-vault\/(.+)$/);
+    if (match) {
+      return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(decodeURIComponent(match[1]))}`;
+    }
+  }
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  if (pathOrUrl.startsWith('/payments/')) {
+    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
+  }
+  if (pathOrUrl.startsWith('/vault/')) {
+    return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
+  }
+  return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl)}`;
+}
+
 export default function ProviderPaymentsHistoryPage() {
   const router = useRouter();
   const [payments, setPayments] = useState<ProviderPayment[]>([]);
@@ -102,12 +125,26 @@ export default function ProviderPaymentsHistoryPage() {
     };
   }, [payments]);
 
-  // Compute active status
+  // Compute active status with robust multi-layer fallback (listing_periods table, verified payment duration, or local store)
   const now = new Date().getTime();
-  const expiresAt = listingPeriod ? new Date(listingPeriod.expires_at).getTime() : 0;
+  const latestVerifiedPayment = payments.find((p) => p.status === 'verified');
+  
+  let effectiveExpiresAt = listingPeriod ? new Date(listingPeriod.expires_at).getTime() : 0;
+  
+  if (!effectiveExpiresAt && latestVerifiedPayment) {
+    const verifiedTime = new Date(latestVerifiedPayment.verified_at || latestVerifiedPayment.submitted_at).getTime();
+    const durationDays = latestVerifiedPayment.listing_plan_duration_days || (
+      latestVerifiedPayment.listing_plan_name?.includes('90') ? 90 :
+      latestVerifiedPayment.listing_plan_name?.includes('180') ? 180 :
+      latestVerifiedPayment.listing_plan_name?.includes('365') ? 365 :
+      latestVerifiedPayment.listing_plan_name?.includes('30') ? 30 : 90
+    );
+    effectiveExpiresAt = verifiedTime + durationDays * 24 * 3600 * 1000;
+  }
+
   const graceWindow = (listingPeriod?.grace_period_hours || 48) * 3600 * 1000;
-  const isPeriodActive = listingPeriod ? expiresAt + graceWindow > now && listingPeriod.status === 'active' : false;
-  const daysLeft = Math.max(0, Math.ceil((expiresAt - now) / (1000 * 3600 * 24)));
+  const isPeriodActive = effectiveExpiresAt > 0 && effectiveExpiresAt + graceWindow > now;
+  const daysLeft = Math.max(0, Math.ceil((effectiveExpiresAt - now) / (1000 * 3600 * 24)));
 
   return (
     <AppLayout title="Payment & Subscription History | Blue Sky Provider" headerTitle="Billing & Invoices">
@@ -203,8 +240,8 @@ export default function ProviderPaymentsHistoryPage() {
                 Listing Access Status: {isPeriodActive ? `Active (${daysLeft} Days Remaining)` : 'Access Inactive / Expired'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                {listingPeriod
-                  ? `Access valid through ${new Date(listingPeriod.expires_at).toLocaleDateString()} (+48h grace safety window included)`
+                {isPeriodActive && effectiveExpiresAt
+                  ? `Access valid through ${new Date(effectiveExpiresAt).toLocaleDateString()} (+48h grace safety window included)`
                   : 'Subscribe to an access plan to publish listings globally and accept verified tenant applications.'}
               </div>
             </div>
@@ -212,7 +249,7 @@ export default function ProviderPaymentsHistoryPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Badge variant={isPeriodActive ? 'active' : 'expired'}>
-              {isPeriodActive ? '🟢 ACTIVE ACCESS' : '🔴 EXPIRED'}
+              {isPeriodActive ? 'ACTIVE ACCESS' : 'EXPIRED'}
             </Badge>
 
             <Link href="/provider/plans" className="btn btn-outline btn-sm" style={{ backgroundColor: 'white' }}>
@@ -348,10 +385,10 @@ export default function ProviderPaymentsHistoryPage() {
                           }
                         >
                           {isVerified
-                            ? '✓ VERIFIED & ACTIVATED'
+                            ? 'VERIFIED & ACTIVATED'
                             : isPending
-                            ? '⏳ AUDIT IN PROGRESS'
-                            : '⚠️ ACTION REQUIRED'}
+                            ? 'AUDIT IN PROGRESS'
+                            : 'ACTION REQUIRED'}
                         </Badge>
                         <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>
                           ID: {pmt.id.slice(0, 10)}...
@@ -466,9 +503,29 @@ export default function ProviderPaymentsHistoryPage() {
                       gap: 8,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <FileText size={14} />
-                      <span>Receipt File: {pmt.proof_storage_path.split('/').pop() || 'receipt.png'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <FileText size={14} />
+                        <span>Receipt File: {pmt.proof_storage_path.split('/').pop() || 'receipt.png'}</span>
+                      </div>
+                      {pmt.proof_storage_path && (
+                        <a
+                          href={resolveDocumentUrl(pmt.proof_storage_path)}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            color: 'var(--color-primary)',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            textDecoration: 'none',
+                            fontSize: 12,
+                          }}
+                        >
+                          <ExternalLink size={12} /> View Proof
+                        </a>
+                      )}
                     </div>
 
                     <Link

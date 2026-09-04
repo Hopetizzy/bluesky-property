@@ -15,6 +15,7 @@ import {
   LogOut,
   PlusCircle,
   Shield,
+  Bell,
 } from 'lucide-react';
 import { store } from '@/lib/store';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
@@ -52,10 +53,10 @@ export const AdminDrawer: React.FC<AdminDrawerProps> = ({ isOpen, onClose }) => 
     { label: 'Providers', href: '/admin/providers', icon: Users },
     { label: 'Payments Verification', href: '/admin/payments', icon: CreditCard, badge: pendingPaymentsCount > 0 ? pendingPaymentsCount : undefined, badgeColor: '#F59E0B' },
     { label: 'Applications', href: '/admin/applications', icon: FileCheck, badge: pendingAppsCount > 0 ? pendingAppsCount : undefined, badgeColor: '#0066FF' },
-    { label: 'Listing Plans & Fees', href: '/admin/plans', icon: Settings },
-    { label: 'Messages', href: '/applicant/messages', icon: MessageSquare },
+    { label: 'Listing Plans & Fees', href: '/admin/plans', icon: Shield },
+    { label: 'Support Messages', href: '/admin/messages', icon: MessageSquare },
     { label: 'FAQs & Keywords', href: '/faq', icon: HelpCircle },
-    { label: 'Settings', href: '/settings', icon: Settings },
+    { label: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 
   return (

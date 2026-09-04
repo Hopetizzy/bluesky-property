@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const appIds = appRows.map((a: any) => a.id);
 
       // Fetch related data in parallel
-      const [propsRes, unitsRes, profilesRes, docsRes, imagesRes] = await Promise.all([
+      const [propsRes, unitsRes, profilesRes, docsRes, imagesRes, paymentsRes] = await Promise.all([
         propertyIds.length > 0
           ? supabaseServer
               .from('properties')
@@ -63,6 +63,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .select('property_id, storage_path, is_primary, display_order')
               .in('property_id', propertyIds)
           : Promise.resolve({ data: [] }),
+        appIds.length > 0
+          ? supabaseServer
+              .from('application_payments')
+              .select('*')
+              .in('application_id', appIds)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
       ]);
 
       const propMap = new Map((propsRes.data || []).map((p: any) => [p.id, p]));
@@ -83,11 +90,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         docsByApp.set(d.application_id, list);
       });
 
+      const paymentsByApp = new Map<string, any[]>();
+      (paymentsRes.data || []).forEach((p: any) => {
+        const list = paymentsByApp.get(p.application_id) || [];
+        list.push(p);
+        paymentsByApp.set(p.application_id, list);
+      });
+
       const formatted = appRows.map((row: any) => {
         const prop = propMap.get(row.property_id);
         const unit = unitMap.get(row.unit_id);
         const profile = profileMap.get(row.applicant_id);
         const docs = docsByApp.get(row.id) || [];
+        const appPayments = paymentsByApp.get(row.id) || [];
         const propImage = imagesByProp.get(row.property_id) || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
 
         // Extract or format SSN
@@ -126,6 +141,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           additional_notes: row.additional_notes,
           admin_notes: row.admin_notes,
           documents: docs,
+          payment: appPayments[0] || null,
+          payments: appPayments,
           submitted_at: row.submitted_at || row.created_at || new Date().toISOString(),
           reviewed_at: row.reviewed_at,
           reviewed_by: row.reviewed_by,
@@ -142,7 +159,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // PATCH: Update Application Status & Record Audit / In-App Notification
   if (req.method === 'PATCH') {
     try {
-      const { id, status, admin_notes, reviewer_name } = req.body;
+      const { id, status, admin_notes, reviewer_name, payment_id, payment_status, payment_rejection_reason } = req.body;
+
+      // Handle standalone payment update if provided
+      if (payment_id && payment_status) {
+        await supabaseServer.from('application_payments').update({
+          status: payment_status,
+          rejection_reason: payment_rejection_reason || null,
+          verified_at: payment_status === 'verified' ? new Date().toISOString() : null,
+          verified_by: reviewer_name || 'Super Admin',
+          updated_at: new Date().toISOString(),
+        }).eq('id', payment_id);
+
+        if (!id && !status) {
+          return res.status(200).json({ success: true, message: `Payment updated to ${payment_status}` });
+        }
+      }
+
       if (!id || !status) {
         return res.status(400).json({ success: false, error: 'Application ID and status required' });
       }
@@ -190,11 +223,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const isApproved = status === 'approved';
             const isRejected = status === 'rejected';
 
-            let notifTitle = '📋 Rental Application Update';
+            let notifTitle = 'Rental Application Update';
             let notifMessage = `Your rental application #${appRecord.application_ref} status has been updated to ${status}.`;
 
             if (isApproved) {
-              notifTitle = '🎉 Rental Application Approved!';
+              notifTitle = 'Rental Application Approved';
               notifMessage = `Congratulations! Your rental application #${appRecord.application_ref} has been approved by the property team. Our manager will contact you via email regarding the lease agreement.`;
             } else if (isRejected) {
               notifTitle = 'Rental Application Notice';
@@ -203,7 +236,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             await supabaseServer.from('notifications').insert({
               profile_id: appRecord.applicant_id,
-              type: 'application_status',
+              type: 'application',
               title: notifTitle,
               message: notifMessage,
               link_url: '/applicant/applications',

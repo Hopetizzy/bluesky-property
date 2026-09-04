@@ -242,7 +242,7 @@ export default function ListingPlansPage() {
               </div>
 
               <Badge variant={isPeriodActive ? 'active' : 'expired'}>
-                {isPeriodActive ? '🟢 ACTIVE ACCESS' : '🔴 EXPIRED'}
+                {isPeriodActive ? 'ACTIVE ACCESS' : 'EXPIRED'}
               </Badge>
             </div>
           )}
@@ -515,10 +515,10 @@ export default function ListingPlansPage() {
                         }
                       >
                         {pmt.status === 'verified'
-                          ? '✓ VERIFIED'
+                          ? 'VERIFIED'
                           : pmt.status === 'rejected'
-                          ? '⚠️ REJECTED'
-                          : '⏳ REVIEW PENDING'}
+                          ? 'REJECTED'
+                          : 'REVIEW PENDING'}
                       </Badge>
                     </div>
                   </div>

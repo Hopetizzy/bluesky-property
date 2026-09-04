@@ -445,11 +445,11 @@ export default function ProviderPropertiesPage() {
                           }
                         >
                           {prop.status === 'approved'
-                            ? '✓ LIVE & APPROVED'
+                            ? 'LIVE & APPROVED'
                             : prop.status === 'pending_verification'
-                            ? '⏳ PENDING REVIEW'
+                            ? 'PENDING REVIEW'
                             : prop.status === 'rejected'
-                            ? '⚠️ CHANGES REQUIRED'
+                            ? 'CHANGES REQUIRED'
                             : prop.status.replace('_', ' ').toUpperCase()}
                         </Badge>
 

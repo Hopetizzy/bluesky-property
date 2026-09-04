@@ -45,6 +45,7 @@ export default function AdminPaymentsPage() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [zoomReceipt, setZoomReceipt] = useState(false);
+  const [receiptLoadFailed, setReceiptLoadFailed] = useState(false);
   const [refreshFeedback, setRefreshFeedback] = useState<string | null>(null);
 
   const presetReasons = [
@@ -153,10 +154,27 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const getProofImageUrl = (path?: string) => {
-    if (!path) return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1000&q=80';
-    if (path.startsWith('http')) return path;
-    return path;
+  const getProofImageUrl = (pathOrUrl?: string) => {
+    if (!pathOrUrl) return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1000&q=80';
+    if (pathOrUrl.startsWith('data:') || (pathOrUrl.startsWith('http') && pathOrUrl.includes('token='))) {
+      return pathOrUrl;
+    }
+    if (pathOrUrl.includes('supabase.co/storage') && !pathOrUrl.includes('token=')) {
+      const match = pathOrUrl.match(/\/payment-proofs-vault\/(.+)$/);
+      if (match) {
+        return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(decodeURIComponent(match[1]))}`;
+      }
+    }
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return pathOrUrl;
+    }
+    if (pathOrUrl.startsWith('/payments/')) {
+      return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
+    }
+    if (pathOrUrl.startsWith('/vault/')) {
+      return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
+    }
+    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl)}`;
   };
 
   const handleDownloadProof = (url: string, filename: string) => {
@@ -669,6 +687,7 @@ export default function AdminPaymentsPage() {
           setIsRejecting(false);
           setRejectionReason('');
           setZoomReceipt(false);
+          setReceiptLoadFailed(false);
         }}
         title="Audit Payment Proof & Activate"
       >
@@ -772,11 +791,27 @@ export default function AdminPaymentsPage() {
                   justifyContent: 'center',
                 }}
               >
-                <img
-                  src={getProofImageUrl(inspectingPayment.proof_storage_path)}
-                  alt="Payment Receipt"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
+                {!receiptLoadFailed ? (
+                  <img
+                    src={getProofImageUrl(inspectingPayment.proof_storage_path)}
+                    alt="Payment Receipt"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    onError={() => setReceiptLoadFailed(true)}
+                  />
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 20 }}>
+                    <FileText size={48} color="#38BDF8" style={{ margin: '0 auto 8px auto' }} />
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC' }}>
+                      Payment Proof Record
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                      {inspectingPayment.payment_method_name} • ${inspectingPayment.amount} {inspectingPayment.currency_code}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#38BDF8', marginTop: 8 }}>
+                      Ref: {inspectingPayment.proof_storage_path ? inspectingPayment.proof_storage_path.split('/').pop() : 'Direct Underwriting Submission'}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

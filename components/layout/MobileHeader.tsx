@@ -113,7 +113,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     { label: 'My Properties', href: '/provider/properties', icon: Building },
     { label: 'Listing Plans', href: '/provider/plans', icon: Shield },
     { label: 'Payment History', href: '/provider/payments', icon: FileText },
-    { label: 'Notifications', href: '/notifications', icon: Bell },
   ];
 
   const adminNavLinks = [
@@ -123,11 +122,17 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     { label: 'Applications', href: '/admin/applications', icon: FileText },
     { label: 'Providers', href: '/admin/providers', icon: Users },
     { label: 'Plans & Fees', href: '/admin/plans', icon: Shield },
-    { label: 'Settings', href: '/settings', icon: Settings },
+    { label: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 
   const isAdminRoute = currentPath.startsWith('/admin') || role === 'admin';
   const isProviderRoute = currentPath.startsWith('/provider') || role === 'provider';
+
+  const notificationHref = isAdminRoute
+    ? '/admin/notifications'
+    : isProviderRoute
+    ? '/provider/notifications'
+    : '/applicant/notifications';
 
   const activeLinks = isAdminRoute
     ? adminNavLinks
@@ -301,7 +306,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
           )}
 
           <Link
-            href="/notifications"
+            href={notificationHref}
             style={{
               position: 'relative',
               display: 'flex',

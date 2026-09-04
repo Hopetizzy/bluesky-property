@@ -215,7 +215,7 @@ export default function ProviderDashboardPage() {
                   )}
                 </div>
                 <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
-                  {displayName} 👋
+                  {displayName}
                 </h1>
                 <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>
                   {providerProfile?.provider_type
@@ -266,10 +266,10 @@ export default function ProviderDashboardPage() {
                 </div>
                 <Badge variant={isPeriodActive ? 'active' : isGraceActive ? 'expiring' : 'expired'}>
                   {isPeriodActive
-                    ? '🟢 ACTIVE ACCESS'
+                    ? 'ACTIVE ACCESS'
                     : isGraceActive
-                    ? '🟡 48H GRACE WINDOW'
-                    : '🔴 ACCESS EXPIRED'}
+                    ? '48H GRACE WINDOW'
+                    : 'ACCESS EXPIRED'}
                 </Badge>
               </div>
 
@@ -613,11 +613,11 @@ export default function ProviderDashboardPage() {
                               }
                             >
                               {prop.status === 'approved'
-                                ? '✓ LIVE & PUBLISHED'
+                                ? 'LIVE & PUBLISHED'
                                 : prop.status === 'pending_verification'
-                                ? '⏳ IN REVIEW'
+                                ? 'IN REVIEW'
                                 : prop.status === 'rejected'
-                                ? '⚠️ CHANGES NEEDED'
+                                ? 'CHANGES NEEDED'
                                 : prop.status.replace('_', ' ').toUpperCase()}
                             </Badge>
 

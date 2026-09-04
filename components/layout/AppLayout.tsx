@@ -128,7 +128,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     <>
       <Head>
         <title>{title}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
           name="description"
           content="Verified rental property management and tenant application platform worldwide across USA, Canada, UK, and Australia."

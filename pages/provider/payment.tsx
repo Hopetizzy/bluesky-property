@@ -16,12 +16,14 @@ import {
   ExternalLink,
   ChevronRight,
   X,
+  Info,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { store } from '@/lib/store';
 import { listingPlansDb } from '@/lib/db/listingPlans';
+import { notifyPaymentUploaded } from '@/lib/notificationService';
 import { ListingPlan, PaymentMethod, ProviderPayment, ProviderProfile } from '@/lib/types';
 
 export default function ProviderPaymentPage() {
@@ -31,6 +33,7 @@ export default function ProviderPaymentPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string>('');
   const [uploadedProof, setUploadedProof] = useState<string | null>(null);
+  const [uploadedStoragePath, setUploadedStoragePath] = useState<string>('');
   const [proofFileName, setProofFileName] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -120,42 +123,32 @@ export default function ProviderPaymentPage() {
 
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
+      reader.onload = async (uploadEvent) => {
         const rawResult = uploadEvent.target?.result as string;
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const maxDim = 900;
-            let width = img.width;
-            let height = img.height;
+        setUploadedProof(rawResult);
 
-            if (width > height && width > maxDim) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else if (height > maxDim) {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
+        // Upload to storage vault in background and persist on server
+        try {
+          const res = await fetch('/api/vault/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileName: `provider_${Date.now()}_${file.name}`,
+              fileData: rawResult,
+              bucket: 'payment-proofs-vault',
+              folder: 'payments',
+            }),
+          });
+          const json = await res.json();
+          if (json.success && json.storage_path) {
+            setUploadedStoragePath(json.storage_path);
+            if (json.preview_url) {
+              setUploadedProof(json.preview_url);
             }
-
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, width, height);
-              const compressed = canvas.toDataURL('image/jpeg', 0.7);
-              setUploadedProof(compressed);
-            } else {
-              setUploadedProof(rawResult.length > 80000 ? `receipt_${Date.now()}.jpg` : rawResult);
-            }
-          } catch {
-            setUploadedProof(rawResult.length > 80000 ? `receipt_${Date.now()}.jpg` : rawResult);
           }
-        };
-        img.onerror = () => {
-          setUploadedProof(`receipt_${Date.now()}.jpg`);
-        };
-        img.src = rawResult;
+        } catch (uploadErr) {
+          console.warn('Provider payment proof background upload note:', uploadErr);
+        }
       };
       reader.readAsDataURL(file);
     } else {
@@ -215,23 +208,12 @@ export default function ProviderPaymentPage() {
         }
       }
 
-      let proofPath = uploadedProof || `receipt_${Date.now()}.jpg`;
-
-      // If Supabase is configured and we have an image, try to upload to storage
-      if (isSupabaseConfigured() && uploadedProof && uploadedProof.startsWith('data:')) {
-        try {
-          const res = await fetch(uploadedProof);
-          const blob = await res.blob();
-          const fileName = `provider_${resolvedProvId}_${Date.now()}.jpg`;
-          const { data: uploadData, error: uploadErr } = await supabase.storage
-            .from('payment-proofs-vault')
-            .upload(fileName, blob, { contentType: 'image/jpeg', upsert: true });
-
-          if (!uploadErr && uploadData?.path) {
-            proofPath = uploadData.path;
-          }
-        } catch (storageErr) {
-          console.warn('Storage upload note:', storageErr);
+      let proofPath = uploadedStoragePath;
+      if (!proofPath) {
+        if (uploadedProof && uploadedProof.startsWith('http')) {
+          proofPath = uploadedProof;
+        } else {
+          proofPath = `/payments/provider_${resolvedProvId}_${Date.now()}.jpg`;
         }
       }
 
@@ -251,6 +233,21 @@ export default function ProviderPaymentPage() {
       };
 
       await listingPlansDb.submitPayment(newPayment);
+
+      try {
+        await notifyPaymentUploaded({
+          paymentId: newPayment.id,
+          userType: 'provider',
+          userId: resolvedProvId,
+          userEmail: resolvedProvName,
+          planOrPropertyTitle: selectedPlan.name,
+          amount: selectedPlan.price,
+          currency: selectedPlan.currency_code,
+        });
+      } catch (notifErr) {
+        console.warn('Provider payment notification note:', notifErr);
+      }
+
       setIsSubmitted(true);
     } catch (err: any) {
       console.error('Payment submit error:', err?.message || err);
@@ -339,7 +336,7 @@ export default function ProviderPaymentPage() {
               </div>
               <div className="flex-between">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Status:</span>
-                <Badge variant="pending">⏳ AUDIT IN PROGRESS</Badge>
+                <Badge variant="pending">AUDIT IN PROGRESS</Badge>
               </div>
             </div>
 
@@ -432,8 +429,9 @@ export default function ProviderPaymentPage() {
                       </span>
                     </div>
 
-                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', borderTop: '1px solid #F1F5F9', paddingTop: 10 }}>
-                      ✓ Includes unlimited property listings, zero commissions, and 48-hour grace period protection.
+                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', borderTop: '1px solid #F1F5F9', paddingTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Check size={14} color="var(--color-success)" />
+                      Includes unlimited property listings, zero commissions, and 48-hour grace period protection.
                     </div>
                   </div>
                 )}
@@ -487,15 +485,15 @@ export default function ProviderPaymentPage() {
                           </div>
                           <Badge variant={isSelected ? 'primary' : 'info'}>
                             {method.type === 'interac_etransfer'
-                              ? '🇨🇦 INTERAC'
+                              ? 'INTERAC'
                               : method.type === 'bitcoin'
-                              ? '⚡ BITCOIN'
+                              ? 'BITCOIN'
                               : method.type === 'cash_app'
-                              ? '💵 CASH APP'
+                              ? 'CASH APP'
                               : method.type === 'chime'
-                              ? '🟢 CHIME'
+                              ? 'CHIME'
                               : method.type === 'facebook_pay'
-                              ? '🔵 META PAY'
+                              ? 'META PAY'
                               : method.type.toUpperCase()}
                           </Badge>
                         </div>
@@ -588,8 +586,9 @@ export default function ProviderPaymentPage() {
                       )}
 
                       {copiedKey && (
-                        <div style={{ fontSize: 11, color: 'var(--color-success)', marginTop: 6, fontWeight: 700 }}>
-                          ✓ Copied to clipboard!
+                        <div style={{ fontSize: 11, color: 'var(--color-success)', marginTop: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Check size={13} color="var(--color-success)" />
+                          Copied to clipboard!
                         </div>
                       )}
                     </div>
@@ -660,9 +659,15 @@ export default function ProviderPaymentPage() {
                       color: 'var(--color-text-secondary)',
                       lineHeight: 1.5,
                       border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
                     }}
                   >
-                    💡 <strong>Quick Activation Tip:</strong> Include your provider business name or email in the payment transfer memo so our audit team can verify your payment instantly.
+                    <Info size={16} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Quick Activation Tip:</strong> Include your provider business name or email in the payment transfer memo so our audit team can verify your payment instantly.
+                    </span>
                   </div>
 
                   <button

@@ -26,6 +26,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import { store } from '@/lib/store';
 import { propertiesDb } from '@/lib/db/properties';
 import { listingPlansDb } from '@/lib/db/listingPlans';
+import { notifyPropertyCreated } from '@/lib/notificationService';
 import { Property, PropertyUnit, PropertyType, ProviderListingPeriod, ProviderProfile } from '@/lib/types';
 import { SUPPORTED_REGIONS, getStatesForCountry } from '@/lib/constants';
 
@@ -359,6 +360,17 @@ export default function AddPropertyPage() {
       };
 
       await propertiesDb.saveProperty(newProperty);
+
+      try {
+        await notifyPropertyCreated({
+          propertyId: newProperty.id,
+          propertyTitle: newProperty.title,
+          providerId: newProperty.provider_id,
+        });
+      } catch (notifErr) {
+        console.warn('Property created notification note:', notifErr);
+      }
+
       router.push(`/provider/properties/${newProperty.id}/status`);
     } catch (err) {
       console.error('Error creating property:', err);

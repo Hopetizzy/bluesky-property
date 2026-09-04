@@ -23,9 +23,10 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export const Badge: React.FC<BadgeProps> = ({ children, variant = 'info', className = '' }) => {
+export const Badge: React.FC<BadgeProps> = ({ children, variant = 'info', className = '', style }) => {
   // Normalize mapped CSS classes
   const cssClass =
     variant === 'warning' || variant === 'pending_verification'
@@ -36,5 +37,5 @@ export const Badge: React.FC<BadgeProps> = ({ children, variant = 'info', classN
       ? 'badge-info'
       : `badge-${variant}`;
 
-  return <span className={`badge ${cssClass} ${className}`}>{children}</span>;
+  return <span className={`badge ${cssClass} ${className}`} style={style}>{children}</span>;
 };

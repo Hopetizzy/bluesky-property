@@ -224,6 +224,7 @@ export interface ApplicationDocument {
   created_at: string;
 }
 
+
 export interface RentalApplication {
   id: string;
   application_ref: string;
@@ -257,6 +258,8 @@ export interface RentalApplication {
   additional_notes?: string;
   admin_notes?: string;
   documents: ApplicationDocument[];
+  payment?: ApplicationPayment;
+  payments?: ApplicationPayment[];
   submitted_at: string;
   reviewed_at?: string;
   reviewed_by?: string;
@@ -301,7 +304,9 @@ export interface FAQ {
 
 export interface NotificationItem {
   id: string;
-  user_id: string;
+  user_id?: string;
+  profile_id?: string;
+  role?: string; // 'admin' | 'provider' | 'applicant' | 'all'
   type: string;
   title: string;
   message: string;
@@ -319,7 +324,7 @@ export interface ApplicationFeeSettings {
 export interface ApplicationPayment {
   id: string;
   application_id: string;
-  applicant_id: string;
+  applicant_id?: string;
   payment_method_id?: string;
   payment_method_name?: string;
   amount: number;
@@ -328,7 +333,7 @@ export interface ApplicationPayment {
   proof_file_name?: string;
   status: PaymentStatus;
   rejection_reason?: string;
-  submitted_at: string;
+  submitted_at?: string;
   verified_at?: string;
   verified_by?: string;
 }

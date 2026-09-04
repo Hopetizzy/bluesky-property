@@ -1092,6 +1092,17 @@ class DataStore {
     return this.getItem<NotificationItem[]>('notifications', INITIAL_NOTIFICATIONS);
   }
 
+  public addNotification(notification: NotificationItem): void {
+    const notifs = this.getNotifications();
+    const existingIdx = notifs.findIndex((n) => n.id === notification.id);
+    if (existingIdx >= 0) {
+      notifs[existingIdx] = notification;
+    } else {
+      notifs.unshift(notification);
+    }
+    this.setItem('notifications', notifs);
+  }
+
   public markNotificationAsRead(id: string): void {
     const notifs = this.getNotifications();
     const index = notifs.findIndex((n) => n.id === id);
@@ -1099,6 +1110,16 @@ class DataStore {
       notifs[index].is_read = true;
       this.setItem('notifications', notifs);
     }
+  }
+
+  public markAllNotificationsAsRead(filterRole?: string): void {
+    const notifs = this.getNotifications();
+    notifs.forEach((n) => {
+      if (!filterRole || !n.role || n.role === filterRole || n.role === 'all') {
+        n.is_read = true;
+      }
+    });
+    this.setItem('notifications', notifs);
   }
 
   // Application Fee Settings (Admin configurable)

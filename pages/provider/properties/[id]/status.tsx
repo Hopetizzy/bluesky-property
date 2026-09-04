@@ -177,11 +177,11 @@ export default function PropertyVerificationStatusPage() {
                   }
                 >
                   {isApproved
-                    ? '✓ LIVE ON MARKETPLACE'
+                    ? 'LIVE ON MARKETPLACE'
                     : isPending
-                    ? '⏳ UNDER COMPLIANCE REVIEW'
+                    ? 'UNDER COMPLIANCE REVIEW'
                     : isRejected
-                    ? '⚠️ CHANGES REQUIRED'
+                    ? 'CHANGES REQUIRED'
                     : property.status.replace('_', ' ').toUpperCase()}
                 </Badge>
 
@@ -429,8 +429,9 @@ export default function PropertyVerificationStatusPage() {
             >
               {property.verification_notes || 'Please provide clear exterior photos with building numbers and verify the exact postal code.'}
             </div>
-            <div style={{ fontSize: 12, marginTop: 10, color: '#7F1D1D' }}>
-              💡 Once updated, our team will automatically re-evaluate your listing.
+            <div style={{ fontSize: 12, marginTop: 10, color: '#7F1D1D', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertCircle size={14} color="#DC2626" />
+              <span>Once updated, our team will automatically re-evaluate your listing.</span>
             </div>
           </div>
         )}

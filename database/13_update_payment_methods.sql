@@ -97,6 +97,11 @@ ON CONFLICT (id) DO UPDATE SET
     is_active = EXCLUDED.is_active,
     updated_at = NOW();
 
+-- Clear zelle_identifier from Bitcoin if previously set
+UPDATE public.payment_methods
+SET zelle_identifier = NULL
+WHERE type = 'bitcoin' OR id = 'c0000001-0000-0000-0000-000000000004';
+
 -- Step 4: Ensure system_settings contains the updated office address in Atlanta, GA
 INSERT INTO public.system_settings (key, value, description)
 VALUES 

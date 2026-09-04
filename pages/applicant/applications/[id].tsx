@@ -27,7 +27,15 @@ export default function ApplicationDetailPage() {
             .from('rental_applications')
             .select(`
               *,
-              properties (id, title, street_address, city, state_province, country_code),
+              properties (
+                id,
+                title,
+                street_address,
+                city,
+                state_province,
+                country_code,
+                property_images (storage_path, is_primary, sort_order)
+              ),
               property_units (id, unit_number_or_name, rent_amount, currency_code),
               application_documents (*)
             `)
@@ -35,6 +43,12 @@ export default function ApplicationDetailPage() {
             .maybeSingle();
 
           if (data) {
+            const primaryImg =
+              data.properties?.property_images?.find((pi: any) => pi.is_primary)?.storage_path ||
+              data.properties?.property_images?.[0]?.storage_path ||
+              data.property_image ||
+              'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+
             foundApp = {
               id: String(data.id),
               application_ref: data.application_ref,
@@ -52,10 +66,12 @@ export default function ApplicationDetailPage() {
               submitted_at: data.submitted_at || data.created_at,
               reviewed_at: data.reviewed_at,
               reviewed_by: data.reviewed_by,
+              admin_notes: data.admin_notes,
               property_title: data.properties?.title || 'Residential Property',
               property_address: data.properties
                 ? `${data.properties.street_address}, ${data.properties.city}`
                 : 'Property Address',
+              property_image: primaryImg,
               unit_name: data.property_units?.unit_number_or_name || 'Standard Unit',
               unit_rent: data.property_units?.rent_amount || 0,
               unit_currency: data.property_units?.currency_code || 'USD',
@@ -157,36 +173,57 @@ export default function ApplicationDetailPage() {
               className="card"
               style={{
                 margin: 0,
-                padding: 24,
+                padding: 0,
+                overflow: 'hidden',
                 borderRadius: 'var(--radius-2xl)',
                 backgroundColor: 'var(--color-white)',
                 border: '1px solid var(--color-border)',
                 boxShadow: '0 4px 14px rgba(0, 0, 0, 0.04)',
               }}
             >
-              <div className="flex-between" style={{ marginBottom: 8 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
-                  {app.property_title}
-                </h2>
-                <Badge variant={isApproved ? 'approved' : isRejected ? 'rejected' : 'under_review'}>
-                  {app.status.replace('_', ' ')}
-                </Badge>
-              </div>
-
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-                {app.property_address}
-              </div>
-
+              {/* Property Hero Banner */}
               <div
                 style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 16,
+                  position: 'relative',
+                  height: 180,
+                  width: '100%',
                   backgroundColor: 'var(--color-surface-subtle)',
-                  padding: '12px 14px',
-                  borderRadius: 'var(--radius-lg)',
                 }}
               >
+                <img
+                  src={app.property_image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                  alt={app.property_title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+                  }}
+                />
+                <div style={{ position: 'absolute', top: 12, right: 12 }}>
+                  <Badge variant={isApproved ? 'approved' : isRejected ? 'rejected' : 'under_review'}>
+                    {app.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+              </div>
+
+              <div style={{ padding: 24 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: '0 0 6px 0' }}>
+                  {app.property_title}
+                </h2>
+
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 14 }}>
+                  {app.property_address}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 16,
+                    backgroundColor: 'var(--color-surface-subtle)',
+                    padding: '12px 14px',
+                    borderRadius: 'var(--radius-lg)',
+                  }}
+                >
                 <div>
                   <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textTransform: 'uppercase' }}>Unit:</span>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>{app.unit_name}</div>
@@ -201,6 +238,7 @@ export default function ApplicationDetailPage() {
                 </div>
               </div>
             </div>
+          </div>
 
             {/* 4-Stage Progress Timeline */}
             <div
@@ -325,11 +363,28 @@ export default function ApplicationDetailPage() {
                   >
                     {isApproved ? <CheckCircle2 size={16} /> : isRejected ? <AlertCircle size={16} /> : <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#CBD5E1' }} />}
                   </div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)' }}>Final Decision</div>
                     <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
                       {isApproved ? 'Approved - Lease agreement prepared' : isRejected ? 'Application Declined' : 'Pending final verification signoff'}
                     </div>
+                    {app.admin_notes && (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: '10px 14px',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: isRejected ? '#FEF2F2' : '#F0FDF4',
+                          border: `1px solid ${isRejected ? '#FCA5A5' : '#BBF7D0'}`,
+                          fontSize: 12,
+                          color: isRejected ? '#991B1B' : '#166534',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <strong>{isRejected ? 'Decline Reason / Underwriting Notes:' : 'Reviewer Note:'}</strong>{' '}
+                        {app.admin_notes}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

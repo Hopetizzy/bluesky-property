@@ -49,7 +49,13 @@ export default function ApplicantDashboardPage() {
               .from('rental_applications')
               .select(`
                 *,
-                properties (title, street_address, city, state_province),
+                properties (
+                  title,
+                  street_address,
+                  city,
+                  state_province,
+                  property_images (storage_path, is_primary, sort_order)
+                ),
                 property_units (unit_number_or_name, rent_amount, currency_code)
               `)
               .order('submitted_at', { ascending: false });
@@ -65,32 +71,41 @@ export default function ApplicantDashboardPage() {
             if (appsErr) {
               console.warn('Applications fetch note:', appsErr.message);
             } else if (dbApps && dbApps.length > 0) {
-              appList = dbApps.map((row: any) => ({
-                id: String(row.id),
-                application_ref: row.application_ref,
-                applicant_id: row.applicant_id,
-                property_id: row.property_id,
-                unit_id: row.unit_id,
-                applicant_name: row.applicant_name,
-                applicant_email: row.applicant_email,
-                applicant_phone: row.applicant_phone,
-                status: row.status,
-                desired_move_in: row.desired_move_in,
-                lease_term_months: row.lease_term_months,
-                occupants_count: row.occupants_count,
-                has_pets: row.has_pets,
-                submitted_at: row.submitted_at || row.created_at,
-                reviewed_at: row.reviewed_at,
-                reviewed_by: row.reviewed_by,
-                property_title: row.properties?.title || 'Residential Property',
-                property_address: row.properties
-                  ? `${row.properties.street_address}, ${row.properties.city}`
-                  : 'Property Address',
-                unit_name: row.property_units?.unit_number_or_name || 'Standard Unit',
-                unit_rent: row.property_units?.rent_amount || 0,
-                unit_currency: row.property_units?.currency_code || 'USD',
-                documents: [],
-              }));
+              appList = dbApps.map((row: any) => {
+                const primaryImg =
+                  row.properties?.property_images?.find((pi: any) => pi.is_primary)?.storage_path ||
+                  row.properties?.property_images?.[0]?.storage_path ||
+                  row.property_image ||
+                  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+
+                return {
+                  id: String(row.id),
+                  application_ref: row.application_ref,
+                  applicant_id: row.applicant_id,
+                  property_id: row.property_id,
+                  unit_id: row.unit_id,
+                  applicant_name: row.applicant_name,
+                  applicant_email: row.applicant_email,
+                  applicant_phone: row.applicant_phone,
+                  status: row.status,
+                  desired_move_in: row.desired_move_in,
+                  lease_term_months: row.lease_term_months,
+                  occupants_count: row.occupants_count,
+                  has_pets: row.has_pets,
+                  submitted_at: row.submitted_at || row.created_at,
+                  reviewed_at: row.reviewed_at,
+                  reviewed_by: row.reviewed_by,
+                  property_title: row.properties?.title || 'Residential Property',
+                  property_address: row.properties
+                    ? `${row.properties.street_address}, ${row.properties.city}`
+                    : 'Property Address',
+                  property_image: primaryImg,
+                  unit_name: row.property_units?.unit_number_or_name || 'Standard Unit',
+                  unit_rent: row.property_units?.rent_amount || 0,
+                  unit_currency: row.property_units?.currency_code || 'USD',
+                  documents: [],
+                };
+              });
             }
 
             // Fetch user-specific document count
@@ -313,21 +328,42 @@ export default function ApplicantDashboardPage() {
                     className="card"
                     style={{
                       margin: 0,
-                      padding: '18px 20px',
+                      padding: '14px 16px',
                       borderRadius: 'var(--radius-xl)',
                       backgroundColor: 'var(--color-white)',
                       border: '1px solid var(--color-border)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      gap: 14,
                       transition: 'all 0.15s ease',
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 2 }}>
+                    <div
+                      style={{
+                        width: 58,
+                        height: 58,
+                        borderRadius: 'var(--radius-lg)',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        backgroundColor: 'var(--color-surface-subtle)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                    >
+                      <img
+                        src={app.property_image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                        alt={app.property_title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {app.property_title}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {app.property_address} • Ref: <strong>{app.application_ref}</strong>
                       </div>
                       <Badge variant={app.status === 'approved' ? 'approved' : app.status === 'rejected' ? 'rejected' : 'under_review'}>
@@ -335,7 +371,7 @@ export default function ApplicantDashboardPage() {
                       </Badge>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-primary)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-primary)', flexShrink: 0 }}>
                       <span style={{ fontSize: 12, fontWeight: 700 }}>Track</span>
                       <ChevronRight size={18} />
                     </div>
