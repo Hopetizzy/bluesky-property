@@ -123,7 +123,7 @@ export default function DocumentVaultPage() {
           if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              userDocs = parsed.map((d: any) => {
+              const localDocs = parsed.map((d: any) => {
                 const stPath = d.storage_path || `/vault/${email}/${d.name}`;
                 const preview = d.previewUrl || resolveDocumentUrl(stPath, d.name);
                 return {
@@ -132,7 +132,24 @@ export default function DocumentVaultPage() {
                   previewUrl: preview,
                 };
               });
+
+              // Merge unique docs
+              const seenNames = new Set(userDocs.map((d) => d.name));
+              for (const ld of localDocs) {
+                if (!seenNames.has(ld.name)) {
+                  userDocs.push(ld);
+                  seenNames.add(ld.name);
+                }
+              }
             }
+          }
+
+          // Filter out deleted tombstone records
+          const tombstoneKey = email ? `bluesky_deleted_docs_${email}` : 'bluesky_deleted_docs';
+          const deletedList: string[] = JSON.parse(localStorage.getItem(tombstoneKey) || '[]');
+          if (deletedList.length > 0) {
+            const deletedSet = new Set(deletedList);
+            userDocs = userDocs.filter((d) => !deletedSet.has(d.id) && !deletedSet.has(d.name));
           }
         }
 
@@ -186,6 +203,16 @@ export default function DocumentVaultPage() {
     try {
       const fileName = file.name;
       const fileSize = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+
+      // Clear any tombstone if re-uploading
+      if (typeof window !== 'undefined') {
+        const tombstoneKey = userEmail ? `bluesky_deleted_docs_${userEmail}` : 'bluesky_deleted_docs';
+        try {
+          const deletedList: string[] = JSON.parse(localStorage.getItem(tombstoneKey) || '[]');
+          const filtered = deletedList.filter((x) => x !== fileName);
+          localStorage.setItem(tombstoneKey, JSON.stringify(filtered));
+        } catch (e) {}
+      }
 
       // Read as Data URL
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -243,10 +270,58 @@ export default function DocumentVaultPage() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to remove this document from your vault?')) {
+  const handleDelete = async (id: string) => {
+    const docToDelete = documents.find((d) => d.id === id);
+    if (!docToDelete) return;
+
+    if (confirm(`Are you sure you want to permanently delete "${docToDelete.name}" from your vault?`)) {
+      // 1. Immediately update local state
       const filtered = documents.filter((d) => d.id !== id);
       saveDocsState(filtered);
+
+      // 2. Call server-side deletion API
+      try {
+        await fetch('/api/vault/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: docToDelete.id,
+            storagePath: docToDelete.storage_path,
+            fileName: docToDelete.name,
+            userEmail,
+            bucket: 'applicant-vault',
+          }),
+        });
+      } catch (apiErr) {
+        console.warn('Vault delete API note:', apiErr);
+      }
+
+      // 3. Direct Supabase client delete
+      if (isSupabaseConfigured()) {
+        try {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(docToDelete.id);
+          if (isUuid) {
+            await supabase.from('application_documents').delete().eq('id', docToDelete.id);
+          } else if (docToDelete.name) {
+            await supabase.from('application_documents').delete().eq('file_name', docToDelete.name);
+          }
+        } catch (dbErr) {
+          console.warn('Direct supabase delete note:', dbErr);
+        }
+      }
+
+      // 4. Record tombstone in localStorage so it never reappears upon refresh
+      if (typeof window !== 'undefined') {
+        try {
+          const tombstoneKey = userEmail ? `bluesky_deleted_docs_${userEmail}` : 'bluesky_deleted_docs';
+          const currentDeleted: string[] = JSON.parse(localStorage.getItem(tombstoneKey) || '[]');
+          currentDeleted.push(docToDelete.id, docToDelete.name);
+          localStorage.setItem(tombstoneKey, JSON.stringify(currentDeleted));
+        } catch (e) {}
+      }
+
+      setSuccessMessage(`"${docToDelete.name}" was permanently removed.`);
+      setTimeout(() => setSuccessMessage(''), 4000);
     }
   };
 

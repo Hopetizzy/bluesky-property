@@ -42,21 +42,19 @@ export default function AdminAuthPage() {
         });
 
         if (error) {
-          // If Supabase auth user doesn't exist yet, allow fallback for admin credentials
-          if (cleanEmail === 'admin@blueskyproperty.com' || cleanEmail.includes('admin')) {
-            console.warn('Supabase auth check note, using verified Admin fallback credentials:', error.message);
-          } else {
-            throw new Error(error.message);
-          }
-        } else if (data?.user) {
+          throw new Error(error.message || 'Invalid administrator credentials.');
+        }
+
+        if (data?.user) {
           // Verify profile role is admin
-          const { data: profile } = await supabase
+          const { data: profile, error: profErr } = await supabase
             .from('profiles')
             .select('role, full_name')
-            .or(`auth_user_id.eq.${data.user.id},email.eq.${data.user.email}`)
+            .or(`auth_user_id.eq.${data.user.id},email.eq.${cleanEmail}`)
             .maybeSingle();
 
           if (profile && profile.role !== 'admin') {
+            await supabase.auth.signOut();
             throw new Error('Access denied. This account does not have Super Admin privileges.');
           }
 
@@ -69,31 +67,14 @@ export default function AdminAuthPage() {
 
           setSuccessMessage('Admin authenticated! Redirecting...');
           setTimeout(() => {
-            const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '/admin';
+            const redirect = typeof router.query.redirect === 'string' ? decodeURIComponent(router.query.redirect) : '/admin';
             router.replace(redirect);
           }, 600);
           return;
         }
+      } else {
+        throw new Error('Super Admin database is not configured. Please check environment variables.');
       }
-
-      // Offline / Fallback Mode
-      if (cleanEmail === 'admin@blueskyproperty.com' || cleanEmail.includes('admin')) {
-        store.setCurrentUser({
-          id: 'admin-1',
-          email: cleanEmail,
-          full_name: 'Admin',
-          role: 'admin',
-        });
-
-        setSuccessMessage('Admin authenticated! Redirecting to Command Center...');
-        setTimeout(() => {
-          const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '/admin';
-          router.replace(redirect);
-        }, 600);
-        return;
-      }
-
-      throw new Error('Invalid Super Admin credentials.');
     } catch (err: any) {
       setErrorMessage(err.message || 'Authentication failed. Please verify your credentials.');
     } finally {

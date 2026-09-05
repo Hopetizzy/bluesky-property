@@ -44,6 +44,9 @@ export default function AuthLoginPage() {
     }
   }, [router.query]);
 
+  const redirectUrl = typeof router.query.redirect === 'string' ? decodeURIComponent(router.query.redirect) : null;
+  const isApplyRedirect = redirectUrl && redirectUrl.includes('/apply');
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -60,27 +63,31 @@ export default function AuthLoginPage() {
         });
 
         if (error) {
-          console.warn('Supabase signIn note:', error.message);
-        } else if (data?.user) {
+          throw new Error(error.message || 'Invalid email or password. Please verify your credentials.');
+        }
+
+        if (data?.user) {
           // Check role from profiles table
           const { data: profile } = await supabase
             .from('profiles')
             .select('role, full_name')
-            .or(`auth_user_id.eq.${data.user.id},email.eq.${data.user.email}`)
+            .or(`auth_user_id.eq.${data.user.id},email.eq.${cleanEmail}`)
             .maybeSingle();
 
-          const userRole = (profile?.role as UserRole) || 'applicant';
+          const userRole = (profile?.role as UserRole) || (data.user.user_metadata?.role as UserRole) || 'applicant';
+          const userFullName = profile?.full_name || data.user.user_metadata?.full_name || cleanEmail.split('@')[0];
+
           store.setCurrentUser({
             id: data.user.id,
             email: data.user.email || cleanEmail,
-            full_name: profile?.full_name || cleanEmail.split('@')[0],
+            full_name: userFullName,
             role: userRole,
           });
 
           setSuccessMessage('Welcome back! Redirecting...');
           setTimeout(() => {
-            if (router.query.redirect && typeof router.query.redirect === 'string') {
-              router.replace(router.query.redirect);
+            if (redirectUrl) {
+              router.replace(redirectUrl);
             } else if (userRole === 'admin') {
               router.replace('/admin');
             } else if (userRole === 'provider') {
@@ -91,50 +98,11 @@ export default function AuthLoginPage() {
           }, 600);
           return;
         }
-      }
-
-      // Offline / Fallback Mode
-      let userRole: UserRole = 'applicant';
-      let userFullName = cleanEmail.split('@')[0];
-
-      if (cleanEmail === 'admin@blueskyproperty.com' || cleanEmail.includes('admin')) {
-        userRole = 'admin';
-        userFullName = 'Admin';
-      } else if (
-        cleanEmail === 'helen@pacificheights.com' ||
-        cleanEmail === 'lettings@kensingtonres.co.uk' ||
-        cleanEmail === 'contact@austinpremier.com' ||
-        cleanEmail.includes('provider') ||
-        cleanEmail.includes('realty')
-      ) {
-        userRole = 'provider';
-        userFullName = 'Pacific Heights Realty LLC';
       } else {
-        userRole = 'applicant';
-        userFullName = 'John Doe (Tenant)';
+        throw new Error('Authentication database is not configured. Please verify environment settings.');
       }
-
-      store.setCurrentUser({
-        id: `user-${Date.now()}`,
-        email: cleanEmail,
-        full_name: userFullName,
-        role: userRole,
-      });
-
-      setSuccessMessage('Signed in successfully! Redirecting...');
-      setTimeout(() => {
-        if (router.query.redirect && typeof router.query.redirect === 'string') {
-          router.replace(router.query.redirect);
-        } else if (userRole === 'admin') {
-          router.replace('/admin');
-        } else if (userRole === 'provider') {
-          router.replace('/provider');
-        } else {
-          router.replace('/applicant');
-        }
-      }, 600);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Unable to sign in. Please check your credentials.');
+      setErrorMessage(err.message || 'Unable to sign in. Please verify your email and password.');
     } finally {
       setIsLoading(false);
     }
@@ -196,19 +164,32 @@ export default function AuthLoginPage() {
             },
             { onConflict: 'email' }
           );
+
+          store.setCurrentUser({
+            id: data.user.id,
+            email: cleanEmail,
+            full_name: cleanFullName,
+            role: 'applicant',
+          });
+        } else {
+          store.setCurrentUser({
+            id: `user-${Date.now()}`,
+            email: cleanEmail,
+            full_name: cleanFullName,
+            role: 'applicant',
+          });
         }
+      } else {
+        throw new Error('Registration database is not configured. Please verify environment settings.');
       }
 
-      store.setCurrentUser({
-        id: `user-${Date.now()}`,
-        email: cleanEmail,
-        full_name: cleanFullName,
-        role: 'applicant',
-      });
-
-      setSuccessMessage('Tenant account registered successfully! Redirecting...');
+      setSuccessMessage('Account registered successfully! Redirecting...');
       setTimeout(() => {
-        router.replace('/applicant');
+        if (redirectUrl) {
+          router.replace(redirectUrl);
+        } else {
+          router.replace('/applicant');
+        }
       }, 700);
     } catch (err: any) {
       setErrorMessage(err.message || 'Registration failed. Please try again.');
@@ -255,6 +236,28 @@ export default function AuthLoginPage() {
                 : 'Create your tenant account to search and apply for verified homes'}
             </p>
           </div>
+
+          {/* Application Notice Banner */}
+          {isApplyRedirect && (
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(0, 102, 255, 0.08)',
+                border: '1px solid var(--color-primary)',
+                color: 'var(--color-primary-dark)',
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <ShieldCheck size={18} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+              <span>Authentication required: Sign in or create an account to submit your property application.</span>
+            </div>
+          )}
 
           {/* Tab Switcher */}
           <div

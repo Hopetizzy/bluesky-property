@@ -195,100 +195,118 @@ export default function ApplyForPropertyPage() {
           if (localMethods.length > 0) setSelectedMethodId(localMethods[0].id);
         }
 
-        // 3. Fetch Logged-in User Profile
+        // 3. Fetch Logged-in User Profile & Enforce Auth Guard
+        let authenticatedUser: any = null;
         if (isSupabaseConfigured()) {
           const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            setUserId(user.id);
-            const userEmail = user.email || '';
-            setEmail(userEmail);
+          if (user) authenticatedUser = user;
+        }
 
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .or(`auth_user_id.eq.${user.id},email.eq.${userEmail}`)
-              .maybeSingle();
-
-            if (profile) {
-              setProfileId(profile.id);
-              if (profile.full_name) setFullName(profile.full_name);
-              if (profile.phone) setPhone(profile.phone);
-            } else if (user.user_metadata?.full_name) {
-              setFullName(user.user_metadata.full_name);
-              if (user.user_metadata.phone) setPhone(user.user_metadata.phone);
-            }
-
-            // 4. Auto-Fetch existing documents from user's vault
-            const storageKey = `bluesky_vault_documents_${userEmail}`;
-            const savedDocsStr = localStorage.getItem(storageKey);
-            if (savedDocsStr) {
-              try {
-                const vaultDocs = JSON.parse(savedDocsStr);
-                if (Array.isArray(vaultDocs)) {
-                  const foundId = vaultDocs.find((d: any) => d.type === 'passport' || d.type === 'drivers_license' || d.type === 'national_id');
-                  if (foundId) {
-                    const frontStorage = foundId.storage_path || `/vault/${userEmail}/${foundId.name}`;
-                    const frontPreview = foundId.previewUrl || resolveDocumentUrl(frontStorage, foundId.name);
-                    setIdFrontFile({
-                      name: foundId.name,
-                      size: foundId.size || '1.8 MB',
-                      bytes: foundId.bytes || 1800000,
-                      type: foundId.mime_type || 'image/jpeg',
-                      previewUrl: frontPreview,
-                      storagePath: frontStorage,
-                      fromVault: true,
-                    });
-
-                    const backName = foundId.backName || `${foundId.name.split('.')[0]}_back.jpg`;
-                    const backStorage = foundId.back_storage_path || `/vault/${userEmail}/${backName}`;
-                    const backPreview = foundId.backPreviewUrl || resolveDocumentUrl(backStorage, backName);
-                    setIdBackFile({
-                      name: backName,
-                      size: '1.4 MB',
-                      bytes: 1400000,
-                      type: 'image/jpeg',
-                      previewUrl: backPreview,
-                      storagePath: backStorage,
-                      fromVault: true,
-                    });
-                  }
-                  const foundIncome = vaultDocs.find((d: any) => d.type === 'proof_of_income' || d.type === 'employment_letter' || d.type === 'bank_statement');
-                  if (foundIncome) {
-                    const incStorage = foundIncome.storage_path || `/vault/${userEmail}/${foundIncome.name}`;
-                    const incPreview = foundIncome.previewUrl || resolveDocumentUrl(incStorage, foundIncome.name);
-                    setIncomeDoc({
-                      name: foundIncome.name,
-                      size: foundIncome.size || '2.2 MB',
-                      bytes: foundIncome.bytes || 2200000,
-                      type: foundIncome.mime_type || 'application/pdf',
-                      previewUrl: incPreview,
-                      storagePath: incStorage,
-                      fromVault: true,
-                    });
-                  }
-                  const foundAddress = vaultDocs.find((d: any) => d.type === 'utility_bill_address');
-                  if (foundAddress) {
-                    const addrStorage = foundAddress.storage_path || `/vault/${userEmail}/${foundAddress.name}`;
-                    const addrPreview = foundAddress.previewUrl || resolveDocumentUrl(addrStorage, foundAddress.name);
-                    setAddressDoc({
-                      name: foundAddress.name,
-                      size: foundAddress.size || '1.1 MB',
-                      bytes: foundAddress.bytes || 1100000,
-                      type: foundAddress.mime_type || 'application/pdf',
-                      previewUrl: addrPreview,
-                      storagePath: addrStorage,
-                      fromVault: true,
-                    });
-                  }
-                }
-              } catch (e) {}
-            }
+        if (!authenticatedUser) {
+          const localUser = store.getCurrentUser();
+          if (localUser && localUser.id) {
+            authenticatedUser = {
+              id: localUser.id,
+              email: localUser.email,
+              user_metadata: { full_name: localUser.full_name },
+            };
           }
-        } else {
-          setFeeSettings(store.getApplicationFeeSettings());
-          const localMethods = store.getPaymentMethods().filter((m) => m.is_active);
-          setPaymentMethods(localMethods);
-          if (localMethods.length > 0) setSelectedMethodId(localMethods[0].id);
+        }
+
+        if (!authenticatedUser) {
+          const currentPath = router.asPath || `/properties/${slug}/apply${unitId ? `?unitId=${unitId}` : ''}`;
+          router.replace(`/auth/login?redirect=${encodeURIComponent(currentPath)}`);
+          return;
+        }
+
+        const user = authenticatedUser;
+        setUserId(user.id);
+        const userEmail = user.email || '';
+        setEmail(userEmail);
+
+        if (isSupabaseConfigured()) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`auth_user_id.eq.${user.id},email.eq.${userEmail}`)
+            .maybeSingle();
+
+          if (profile) {
+            setProfileId(profile.id);
+            if (profile.full_name) setFullName(profile.full_name);
+            if (profile.phone) setPhone(profile.phone);
+          } else if (user.user_metadata?.full_name) {
+            setFullName(user.user_metadata.full_name);
+            if (user.user_metadata.phone) setPhone(user.user_metadata.phone);
+          }
+        } else if (user.user_metadata?.full_name) {
+          setFullName(user.user_metadata.full_name);
+        }
+
+        // 4. Auto-Fetch existing documents from user's vault
+        const storageKey = `bluesky_vault_documents_${userEmail}`;
+        const savedDocsStr = localStorage.getItem(storageKey);
+        if (savedDocsStr) {
+          try {
+            const vaultDocs = JSON.parse(savedDocsStr);
+            if (Array.isArray(vaultDocs)) {
+              const foundId = vaultDocs.find((d: any) => d.type === 'passport' || d.type === 'drivers_license' || d.type === 'national_id');
+              if (foundId) {
+                const frontStorage = foundId.storage_path || `/vault/${userEmail}/${foundId.name}`;
+                const frontPreview = foundId.previewUrl || resolveDocumentUrl(frontStorage, foundId.name);
+                setIdFrontFile({
+                  name: foundId.name,
+                  size: foundId.size || '1.8 MB',
+                  bytes: foundId.bytes || 1800000,
+                  type: foundId.mime_type || 'image/jpeg',
+                  previewUrl: frontPreview,
+                  storagePath: frontStorage,
+                  fromVault: true,
+                });
+
+                const backName = foundId.backName || `${foundId.name.split('.')[0]}_back.jpg`;
+                const backStorage = foundId.back_storage_path || `/vault/${userEmail}/${backName}`;
+                const backPreview = foundId.backPreviewUrl || resolveDocumentUrl(backStorage, backName);
+                setIdBackFile({
+                  name: backName,
+                  size: '1.4 MB',
+                  bytes: 1400000,
+                  type: 'image/jpeg',
+                  previewUrl: backPreview,
+                  storagePath: backStorage,
+                  fromVault: true,
+                });
+              }
+              const foundIncome = vaultDocs.find((d: any) => d.type === 'proof_of_income' || d.type === 'employment_letter' || d.type === 'bank_statement');
+              if (foundIncome) {
+                const incStorage = foundIncome.storage_path || `/vault/${userEmail}/${foundIncome.name}`;
+                const incPreview = foundIncome.previewUrl || resolveDocumentUrl(incStorage, foundIncome.name);
+                setIncomeDoc({
+                  name: foundIncome.name,
+                  size: foundIncome.size || '2.2 MB',
+                  bytes: foundIncome.bytes || 2200000,
+                  type: foundIncome.mime_type || 'application/pdf',
+                  previewUrl: incPreview,
+                  storagePath: incStorage,
+                  fromVault: true,
+                });
+              }
+              const foundAddress = vaultDocs.find((d: any) => d.type === 'utility_bill_address');
+              if (foundAddress) {
+                const addrStorage = foundAddress.storage_path || `/vault/${userEmail}/${foundAddress.name}`;
+                const addrPreview = foundAddress.previewUrl || resolveDocumentUrl(addrStorage, foundAddress.name);
+                setAddressDoc({
+                  name: foundAddress.name,
+                  size: foundAddress.size || '1.1 MB',
+                  bytes: foundAddress.bytes || 1100000,
+                  type: foundAddress.mime_type || 'application/pdf',
+                  previewUrl: addrPreview,
+                  storagePath: addrStorage,
+                  fromVault: true,
+                });
+              }
+            }
+          } catch (e) {}
         }
       } catch (err) {
         console.warn('Apply page init note:', err);

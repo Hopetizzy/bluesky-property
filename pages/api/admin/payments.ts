@@ -202,24 +202,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        const startsAt = new Date();
-        const expiresAt = new Date(startsAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
-
-        // 3. Update payment status in database
-        if (isUuid(paymentId)) {
-          await supabaseServer
-            .from('provider_payments')
-            .update({
-              status: 'verified',
-              verified_at: timestamp,
-              updated_at: timestamp,
-            })
-            .eq('id', paymentId);
-        }
-
-        // 4. Create or update listing period
-        if (paymentRow?.provider_id && isUuid(paymentRow.provider_id)) {
-          let resolvedProviderId = paymentRow.provider_id;
+        // 3. Resolve Provider Profile ID
+        let resolvedProviderId = paymentRow?.provider_id;
+        if (resolvedProviderId && isUuid(resolvedProviderId)) {
           try {
             const { data: provMatch } = await supabaseServer
               .from('provider_profiles')
@@ -233,8 +218,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           } catch (provLookupErr) {
             console.warn('Provider profile lookup note:', provLookupErr);
           }
+        }
 
-          // Upsert period
+        // 4. Additive Stacking Calculation: Check if an active period exists with future expiration
+        const now = new Date();
+        let startsAt = new Date();
+
+        if (resolvedProviderId && isUuid(resolvedProviderId)) {
+          const { data: activePeriods } = await supabaseServer
+            .from('provider_listing_periods')
+            .select('expires_at')
+            .eq('provider_id', resolvedProviderId)
+            .eq('status', 'active')
+            .gt('expires_at', now.toISOString())
+            .order('expires_at', { ascending: false })
+            .limit(1);
+
+          if (activePeriods && activePeriods.length > 0 && activePeriods[0].expires_at) {
+            const latestExp = new Date(activePeriods[0].expires_at);
+            if (latestExp.getTime() > now.getTime()) {
+              startsAt = latestExp; // Additive stacking: new duration stacks onto active expiry
+            }
+          }
+        }
+
+        const expiresAt = new Date(startsAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+        // 5. Update payment status in database
+        if (isUuid(paymentId)) {
+          await supabaseServer
+            .from('provider_payments')
+            .update({
+              status: 'verified',
+              verified_at: timestamp,
+              updated_at: timestamp,
+            })
+            .eq('id', paymentId);
+        }
+
+        // 6. Create extended listing period in database
+        if (resolvedProviderId && isUuid(resolvedProviderId)) {
           const periodPayload: any = {
             provider_id: resolvedProviderId,
             listing_plan_id: paymentRow.listing_plan_id,

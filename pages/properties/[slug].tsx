@@ -21,6 +21,8 @@ import {
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
 import { propertiesDb } from '@/lib/db';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { store } from '@/lib/store';
 import { Property, PropertyUnit } from '@/lib/types';
 
 export default function PropertyDetailsPage() {
@@ -31,6 +33,7 @@ export default function PropertyDetailsPage() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isFavorited, setIsFavorited] = useState(false);
   const [isDescExpanded, setIsDescExpanded] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -45,6 +48,41 @@ export default function PropertyDetailsPage() {
     }
     loadProp();
   }, [slug]);
+
+  const handleApplyClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!property) return;
+    setIsCheckingAuth(true);
+
+    const applyUrl = `/properties/${property.slug}/apply${selectedUnit ? `?unitId=${selectedUnit.id}` : ''}`;
+
+    try {
+      let isAuthenticated = false;
+      if (isSupabaseConfigured()) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          isAuthenticated = true;
+        }
+      }
+
+      if (!isAuthenticated) {
+        const currentUser = store.getCurrentUser();
+        if (currentUser && currentUser.id) {
+          isAuthenticated = true;
+        }
+      }
+
+      if (isAuthenticated) {
+        router.push(applyUrl);
+      } else {
+        router.push(`/auth/login?redirect=${encodeURIComponent(applyUrl)}`);
+      }
+    } catch (err) {
+      router.push(`/auth/login?redirect=${encodeURIComponent(applyUrl)}`);
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
 
   if (!property) {
     return (
@@ -368,12 +406,15 @@ export default function PropertyDetailsPage() {
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              <Link
-                href={`/properties/${property.slug}/apply${selectedUnit ? `?unitId=${selectedUnit.id}` : ''}`}
+              <button
+                type="button"
+                onClick={handleApplyClick}
+                disabled={isCheckingAuth}
                 className="btn btn-primary btn-lg"
+                style={{ width: '100%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
               >
-                Apply Now (6-Step Fast Process) <ArrowRight size={18} />
-              </Link>
+                {isCheckingAuth ? 'Checking account...' : 'Apply Now (6-Step Fast Process)'} <ArrowRight size={18} />
+              </button>
 
               <Link
                 href={`/applicant/messages?propertyId=${property.id}`}

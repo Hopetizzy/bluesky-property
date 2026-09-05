@@ -127,24 +127,38 @@ export default function ProviderPaymentsHistoryPage() {
 
   // Compute active status with robust multi-layer fallback (listing_periods table, verified payment duration, or local store)
   const now = new Date().getTime();
-  const latestVerifiedPayment = payments.find((p) => p.status === 'verified');
-  
   let effectiveExpiresAt = listingPeriod ? new Date(listingPeriod.expires_at).getTime() : 0;
   
-  if (!effectiveExpiresAt && latestVerifiedPayment) {
-    const verifiedTime = new Date(latestVerifiedPayment.verified_at || latestVerifiedPayment.submitted_at).getTime();
-    const durationDays = latestVerifiedPayment.listing_plan_duration_days || (
-      latestVerifiedPayment.listing_plan_name?.includes('90') ? 90 :
-      latestVerifiedPayment.listing_plan_name?.includes('180') ? 180 :
-      latestVerifiedPayment.listing_plan_name?.includes('365') ? 365 :
-      latestVerifiedPayment.listing_plan_name?.includes('30') ? 30 : 90
-    );
-    effectiveExpiresAt = verifiedTime + durationDays * 24 * 3600 * 1000;
+  if (!effectiveExpiresAt) {
+    // If listingPeriod table didn't return a record, stack verified payments additively
+    const verifiedPayments = payments
+      .filter((p) => p.status === 'verified')
+      .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime());
+
+    let accumulatedTime = 0;
+    for (const pmt of verifiedPayments) {
+      const pmtTime = new Date(pmt.verified_at || pmt.submitted_at).getTime();
+      const durationDays = pmt.listing_plan_duration_days || (
+        pmt.listing_plan_name?.includes('90') ? 90 :
+        pmt.listing_plan_name?.includes('180') ? 180 :
+        pmt.listing_plan_name?.includes('365') ? 365 :
+        pmt.listing_plan_name?.includes('30') ? 30 : 90
+      );
+      const durationMs = durationDays * 24 * 3600 * 1000;
+      if (accumulatedTime > pmtTime) {
+        accumulatedTime += durationMs;
+      } else {
+        accumulatedTime = pmtTime + durationMs;
+      }
+    }
+    effectiveExpiresAt = accumulatedTime;
   }
 
   const graceWindow = (listingPeriod?.grace_period_hours || 48) * 3600 * 1000;
   const isPeriodActive = effectiveExpiresAt > 0 && effectiveExpiresAt + graceWindow > now;
-  const daysLeft = Math.max(0, Math.ceil((effectiveExpiresAt - now) / (1000 * 3600 * 24)));
+  const msLeft = Math.max(0, effectiveExpiresAt - now);
+  const daysLeft = Math.floor(msLeft / (1000 * 3600 * 24));
+  const hoursLeft = Math.floor((msLeft % (1000 * 3600 * 24)) / (1000 * 3600));
 
   return (
     <AppLayout title="Payment & Subscription History | Blue Sky Provider" headerTitle="Billing & Invoices">
