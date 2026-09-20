@@ -305,48 +305,50 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             </div>
           )}
 
-          <Link
-            href={notificationHref}
-            style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 40,
-              height: 40,
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: isAdminRoute ? '#1E293B' : 'var(--color-surface-subtle)',
-              color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
-              transition: 'all 0.15s ease',
-              textDecoration: 'none',
-            }}
-            aria-label={`Notifications (${unreadNotifs} unread)`}
-          >
-            <Bell size={18} />
-            {unreadNotifs > 0 && (
-              <span
-                style={{
-                  position: 'absolute',
-                  top: 4,
-                  right: 4,
-                  backgroundColor: 'var(--color-danger)',
-                  color: 'white',
-                  fontSize: 10,
-                  fontWeight: 800,
-                  minWidth: 16,
-                  height: 16,
-                  padding: '0 4px',
-                  borderRadius: 9999,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.4)',
-                }}
-              >
-                {unreadNotifs > 99 ? '99+' : unreadNotifs}
-              </span>
-            )}
-          </Link>
+          {(isAdminRoute || isProviderRoute) && (
+            <Link
+              href={notificationHref}
+              style={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 40,
+                height: 40,
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: isAdminRoute ? '#1E293B' : 'var(--color-surface-subtle)',
+                color: isAdminRoute ? '#FFFFFF' : 'var(--color-navy-dark)',
+                transition: 'all 0.15s ease',
+                textDecoration: 'none',
+              }}
+              aria-label={`Notifications (${unreadNotifs} unread)`}
+            >
+              <Bell size={18} />
+              {unreadNotifs > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    backgroundColor: 'var(--color-danger)',
+                    color: 'white',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    minWidth: 16,
+                    height: 16,
+                    padding: '0 4px',
+                    borderRadius: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.4)',
+                  }}
+                >
+                  {unreadNotifs > 99 ? '99+' : unreadNotifs}
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* Secure Sign Out Button */}
           <button

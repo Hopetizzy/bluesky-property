@@ -97,10 +97,11 @@ export default function HomePage() {
     { id: 'studio', label: 'Studios' },
   ];
 
+  const featuredProperties = properties.filter((p) => Boolean(p.featured));
   const filteredProperties =
     activeCategory === 'all'
-      ? properties
-      : properties.filter((p) => p.property_type === activeCategory);
+      ? featuredProperties
+      : featuredProperties.filter((p) => p.property_type === activeCategory);
 
   return (
     <AppLayout
@@ -494,11 +495,34 @@ export default function HomePage() {
           </div>
 
           {/* Responsive Grid */}
-          <div className="grid-responsive-properties">
-            {filteredProperties.slice(0, 8).map((property) => (
-              <PropertyCard key={property.id} property={property} layout="vertical" />
-            ))}
-          </div>
+          {filteredProperties.length > 0 ? (
+            <div className="grid-responsive-properties">
+              {filteredProperties.slice(0, 8).map((property) => (
+                <PropertyCard key={property.id} property={property} layout="vertical" />
+              ))}
+            </div>
+          ) : (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '48px 20px',
+                backgroundColor: 'var(--color-surface-subtle)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px dashed var(--color-border)',
+              }}
+            >
+              <Building2 size={36} color="var(--color-text-muted)" style={{ margin: '0 auto 12px' }} />
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
+                No Featured Properties In This Category
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: 16 }}>
+                Explore our full marketplace of verified residential listings worldwide.
+              </p>
+              <Link href="/properties" className="btn btn-primary btn-sm" style={{ display: 'inline-flex' }}>
+                Browse All Properties ({properties.length})
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

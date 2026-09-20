@@ -173,5 +173,101 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // DELETE: Single or Bulk User/Provider Deletion with Admin Self-Protection
+  if (req.method === 'DELETE') {
+    try {
+      const { id, ids, adminEmail, adminProfileId } = req.body || {};
+      const targetIds: string[] = [];
+
+      if (Array.isArray(ids) && ids.length > 0) {
+        targetIds.push(...ids.filter((i: any) => typeof i === 'string' && i.length > 0));
+      } else if (id && typeof id === 'string') {
+        targetIds.push(id);
+      } else if (req.query.id && typeof req.query.id === 'string') {
+        targetIds.push(req.query.id as string);
+      }
+
+      if (targetIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid user ID(s) provided for deletion' });
+      }
+
+      // 1. Resolve Profile IDs & Provider IDs
+      const { data: matchedProfiles } = await supabaseServer
+        .from('profiles')
+        .select('id, email, role, auth_user_id')
+        .in('id', targetIds);
+
+      const { data: matchedProviders } = await supabaseServer
+        .from('provider_profiles')
+        .select('id, profile_id')
+        .in('id', targetIds);
+
+      // Collect all profile IDs to delete, strictly excluding admins or current admin
+      const profileIdsToDelete = new Set<string>();
+      const providerProfileIdsToDelete = new Set<string>();
+
+      (matchedProfiles || []).forEach((p: any) => {
+        const isSelf = (adminEmail && p.email?.toLowerCase() === adminEmail.toLowerCase()) || (adminProfileId && p.id === adminProfileId);
+        if (!isSelf && p.role !== 'admin') {
+          profileIdsToDelete.add(p.id);
+        }
+      });
+
+      (matchedProviders || []).forEach((prov: any) => {
+        providerProfileIdsToDelete.add(prov.id);
+        if (prov.profile_id && prov.profile_id !== adminProfileId) {
+          profileIdsToDelete.add(prov.profile_id);
+        }
+      });
+
+      const finalProfileIds = Array.from(profileIdsToDelete);
+      const finalProviderIds = Array.from(providerProfileIdsToDelete);
+
+      if (finalProfileIds.length === 0 && finalProviderIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Action cancelled: Cannot delete administrator profile or no valid non-admin users matched.',
+        });
+      }
+
+      // 2. Cascade cleanup related records
+      if (finalProviderIds.length > 0) {
+        await Promise.all([
+          supabaseServer.from('provider_payments').delete().in('provider_id', finalProviderIds),
+          supabaseServer.from('provider_listing_periods').delete().in('provider_id', finalProviderIds),
+          supabaseServer.from('properties').delete().in('provider_id', finalProviderIds),
+          supabaseServer.from('provider_profiles').delete().in('id', finalProviderIds),
+        ]);
+      }
+
+      if (finalProfileIds.length > 0) {
+        await Promise.all([
+          supabaseServer.from('rental_applications').delete().in('applicant_id', finalProfileIds),
+          supabaseServer.from('direct_rental_applications').delete().in('applicant_id', finalProfileIds),
+          supabaseServer.from('conversations').delete().in('applicant_id', finalProfileIds),
+          supabaseServer.from('notifications').delete().in('profile_id', finalProfileIds),
+          supabaseServer.from('provider_profiles').delete().in('profile_id', finalProfileIds),
+        ]);
+
+        // Delete from profiles
+        const { error: deleteProfErr } = await supabaseServer
+          .from('profiles')
+          .delete()
+          .in('id', finalProfileIds);
+
+        if (deleteProfErr) throw deleteProfErr;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${finalProfileIds.length + finalProviderIds.length} user account(s).`,
+        deletedCount: finalProfileIds.length + finalProviderIds.length,
+      });
+    } catch (err: any) {
+      console.error('API /api/admin/providers DELETE error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   return res.status(405).json({ error: 'Method not allowed' });
 }

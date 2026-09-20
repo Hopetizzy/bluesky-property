@@ -10,29 +10,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ success: false, message: 'Supabase server key not configured', data: [] });
   }
 
-  // GET: Fetch all rental applications with relations
+  // GET: Fetch all rental applications (Standard + Direct Portal) with relations
   if (req.method === 'GET') {
     try {
-      // 1. Fetch rental applications
-      const { data: appRows, error: appErr } = await supabaseServer
-        .from('rental_applications')
-        .select('*')
-        .order('submitted_at', { ascending: false });
+      // 1. Fetch standard rental applications and direct rental applications in parallel
+      const [stdAppsRes, directAppsRes] = await Promise.all([
+        supabaseServer.from('rental_applications').select('*').order('submitted_at', { ascending: false }),
+        supabaseServer.from('direct_rental_applications').select('*').order('submitted_at', { ascending: false }),
+      ]);
 
-      if (appErr) throw appErr;
+      const standardRows = stdAppsRes.data || [];
+      const directRows = directAppsRes.data || [];
 
-      if (!appRows || appRows.length === 0) {
+      const allRows = [
+        ...standardRows.map((r: any) => ({ ...r, _table: 'rental_applications', is_direct: false })),
+        ...directRows.map((r: any) => ({ ...r, _table: 'direct_rental_applications', is_direct: true })),
+      ];
+
+      if (allRows.length === 0) {
         return res.status(200).json({ success: true, data: [] });
       }
 
       // Collect related IDs
-      const propertyIds = Array.from(new Set(appRows.map((a: any) => a.property_id).filter(isUuid)));
-      const unitIds = Array.from(new Set(appRows.map((a: any) => a.unit_id).filter(isUuid)));
-      const applicantIds = Array.from(new Set(appRows.map((a: any) => a.applicant_id).filter(isUuid)));
-      const appIds = appRows.map((a: any) => a.id);
+      const propertyIds = Array.from(new Set(allRows.map((a: any) => a.property_id).filter(isUuid)));
+      const unitIds = Array.from(new Set(allRows.map((a: any) => a.unit_id).filter(isUuid)));
+      const applicantIds = Array.from(new Set(allRows.map((a: any) => a.applicant_id).filter(isUuid)));
+      const stdAppIds = standardRows.map((a: any) => a.id);
+      const directAppIds = directRows.map((a: any) => a.id);
 
       // Fetch related data in parallel
-      const [propsRes, unitsRes, profilesRes, docsRes, imagesRes, paymentsRes] = await Promise.all([
+      const [
+        propsRes,
+        unitsRes,
+        profilesRes,
+        stdDocsRes,
+        directDocsRes,
+        imagesRes,
+        stdPaymentsRes,
+        directPaymentsRes,
+      ] = await Promise.all([
         propertyIds.length > 0
           ? supabaseServer
               .from('properties')
@@ -51,24 +67,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               .select('id, full_name, email, phone, avatar_url')
               .in('id', applicantIds)
           : Promise.resolve({ data: [] }),
-        appIds.length > 0
-          ? supabaseServer
-              .from('application_documents')
-              .select('*')
-              .in('application_id', appIds)
+        stdAppIds.length > 0
+          ? supabaseServer.from('application_documents').select('*').in('application_id', stdAppIds)
+          : Promise.resolve({ data: [] }),
+        directAppIds.length > 0
+          ? supabaseServer.from('direct_application_documents').select('*').in('direct_application_id', directAppIds)
           : Promise.resolve({ data: [] }),
         propertyIds.length > 0
-          ? supabaseServer
-              .from('property_images')
-              .select('property_id, storage_path, is_primary, display_order')
-              .in('property_id', propertyIds)
+          ? supabaseServer.from('property_images').select('property_id, storage_path, is_primary, display_order').in('property_id', propertyIds)
           : Promise.resolve({ data: [] }),
-        appIds.length > 0
-          ? supabaseServer
-              .from('application_payments')
-              .select('*')
-              .in('application_id', appIds)
-              .order('created_at', { ascending: false })
+        stdAppIds.length > 0
+          ? supabaseServer.from('application_payments').select('*').in('application_id', stdAppIds).order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] }),
+        directAppIds.length > 0
+          ? supabaseServer.from('direct_application_payments').select('*').in('direct_application_id', directAppIds).order('created_at', { ascending: false })
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -84,33 +96,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       const docsByApp = new Map<string, any[]>();
-      (docsRes.data || []).forEach((d: any) => {
+      (stdDocsRes.data || []).forEach((d: any) => {
         const list = docsByApp.get(d.application_id) || [];
         list.push(d);
         docsByApp.set(d.application_id, list);
       });
+      (directDocsRes.data || []).forEach((d: any) => {
+        const list = docsByApp.get(d.direct_application_id) || [];
+        list.push(d);
+        docsByApp.set(d.direct_application_id, list);
+      });
 
       const paymentsByApp = new Map<string, any[]>();
-      (paymentsRes.data || []).forEach((p: any) => {
+      (stdPaymentsRes.data || []).forEach((p: any) => {
         const list = paymentsByApp.get(p.application_id) || [];
         list.push(p);
         paymentsByApp.set(p.application_id, list);
       });
+      (directPaymentsRes.data || []).forEach((p: any) => {
+        const list = paymentsByApp.get(p.direct_application_id) || [];
+        list.push(p);
+        paymentsByApp.set(p.direct_application_id, list);
+      });
 
-      const formatted = appRows.map((row: any) => {
+      const formatted = allRows.map((row: any) => {
         const prop = propMap.get(row.property_id);
         const unit = unitMap.get(row.unit_id);
         const profile = profileMap.get(row.applicant_id);
         const docs = docsByApp.get(row.id) || [];
         const appPayments = paymentsByApp.get(row.id) || [];
-        const propImage = imagesByProp.get(row.property_id) || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
+        const propImage =
+          imagesByProp.get(row.property_id) ||
+          'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80';
 
-        // Extract or format SSN
         const rawSSN = row.applicant_ssn || (row.id ? `***-**-${row.id.slice(-4)}` : '***-**-4891');
 
         return {
           id: row.id,
           application_ref: row.application_ref || `APP-${row.id.slice(0, 8).toUpperCase()}`,
+          is_direct: Boolean(row.is_direct),
+          source: row.is_direct ? 'direct' : 'listing',
+          link_id: row.link_id || null,
           applicant_id: row.applicant_id,
           applicant_name: row.applicant_name || profile?.full_name || 'Applicant',
           applicant_email: row.applicant_email || profile?.email || 'applicant@bluesky.com',
@@ -123,15 +149,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           applicant_income: row.applicant_income ? Number(row.applicant_income) : 0,
           applicant_ssn: rawSSN,
           property_id: row.property_id,
-          property_title: prop?.title || 'Luxury Property Listing',
+          property_title: prop?.title || (row.is_direct ? 'General Intake Application' : 'Luxury Property Listing'),
           property_image: propImage,
-          property_address: prop?.street_address || (prop ? `${prop.city}, ${prop.state_province}` : 'Peachtree St NE, Atlanta'),
+          property_address: prop?.street_address || (prop ? `${prop.city}, ${prop.state_province}` : 'Direct Tenant Portal'),
           unit_id: row.unit_id,
           unit_name: unit?.unit_number_or_name || 'Main Residence',
-          unit_rent: unit?.rent_amount ? Number(unit.rent_amount) : 2500,
+          unit_rent: unit?.rent_amount ? Number(unit.rent_amount) : 0,
           unit_currency: unit?.currency_code || 'USD',
-          unit_bedrooms: unit?.bedrooms ?? 2,
-          unit_bathrooms: unit?.bathrooms ?? 2,
+          unit_bedrooms: unit?.bedrooms ?? 1,
+          unit_bathrooms: unit?.bathrooms ?? 1,
           status: row.status || 'submitted',
           desired_move_in: row.desired_move_in || new Date().toISOString().split('T')[0],
           lease_term_months: Number(row.lease_term_months) || 12,
@@ -149,6 +175,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
       });
 
+      // Sort by submitted_at desc
+      formatted.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+
       return res.status(200).json({ success: true, data: formatted });
     } catch (err: any) {
       console.error('API /api/admin/applications GET error:', err);
@@ -159,31 +188,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // PATCH: Update Application Status & Record Audit / In-App Notification
   if (req.method === 'PATCH') {
     try {
-      const { id, status, admin_notes, reviewer_name, payment_id, payment_status, payment_rejection_reason } = req.body;
-
-      // Handle standalone payment update if provided
-      if (payment_id && payment_status) {
-        await supabaseServer.from('application_payments').update({
-          status: payment_status,
-          rejection_reason: payment_rejection_reason || null,
-          verified_at: payment_status === 'verified' ? new Date().toISOString() : null,
-          verified_by: reviewer_name || 'Super Admin',
-          updated_at: new Date().toISOString(),
-        }).eq('id', payment_id);
-
-        if (!id && !status) {
-          return res.status(200).json({ success: true, message: `Payment updated to ${payment_status}` });
-        }
-      }
+      const { id, status, admin_notes } = req.body;
 
       if (!id || !status) {
-        return res.status(400).json({ success: false, error: 'Application ID and status required' });
+        return res.status(400).json({ success: false, error: 'Application ID and new status required' });
       }
 
       const updatePayload: any = {
-        status: status,
+        status,
         reviewed_at: new Date().toISOString(),
-        reviewed_by: reviewer_name || 'Super Admin',
         updated_at: new Date().toISOString(),
       };
 
@@ -191,33 +204,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatePayload.admin_notes = admin_notes;
       }
 
-      // 1. Update rental_applications record
-      let query = supabaseServer.from('rental_applications').update(updatePayload);
+      // Try updating standard rental_applications first
+      let updatedApps: any[] | null = null;
+      let appRecord: any = null;
+
+      let stdQuery = supabaseServer.from('rental_applications').update(updatePayload);
       if (isUuid(id)) {
-        query = query.eq('id', id);
+        stdQuery = stdQuery.eq('id', id);
       } else {
-        query = query.eq('application_ref', id);
+        stdQuery = stdQuery.eq('application_ref', id);
+      }
+      const { data: stdData } = await stdQuery.select('*');
+
+      if (stdData && stdData.length > 0) {
+        appRecord = stdData[0];
+      } else {
+        // Try updating direct_rental_applications
+        let directQuery = supabaseServer.from('direct_rental_applications').update(updatePayload);
+        if (isUuid(id)) {
+          directQuery = directQuery.eq('id', id);
+        } else {
+          directQuery = directQuery.eq('application_ref', id);
+        }
+        const { data: directData } = await directQuery.select('*');
+        if (directData && directData.length > 0) {
+          appRecord = directData[0];
+        }
       }
 
-      const { data: updatedApps, error: updateErr } = await query.select('*');
-      if (updateErr) throw updateErr;
-
-      const appRecord = updatedApps && updatedApps.length > 0 ? updatedApps[0] : null;
-
       if (appRecord) {
-        // 2. Audit Trail History record
-        try {
-          await supabaseServer.from('application_status_history').insert({
-            application_id: appRecord.id,
-            new_status: status,
-            notes: admin_notes || `Status transitioned to ${status}`,
-            created_at: new Date().toISOString(),
-          });
-        } catch (auditErr) {
-          console.warn('Status history insert note:', auditErr);
-        }
-
-        // 3. Create In-App Notification for Tenant
+        // Create In-App Notification if applicant has a profile
         if (appRecord.applicant_id && isUuid(appRecord.applicant_id)) {
           try {
             const isApproved = status === 'approved';
@@ -252,6 +268,128 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true, message: `Application updated to ${status}`, data: appRecord });
     } catch (err: any) {
       console.error('API /api/admin/applications PATCH error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  // DELETE: Single or Bulk Rental Application Deletion
+  if (req.method === 'DELETE') {
+    try {
+      const { id, ids } = req.body || {};
+      const targetIds: string[] = [];
+
+      if (Array.isArray(ids) && ids.length > 0) {
+        targetIds.push(...ids.filter((i: any) => typeof i === 'string' && i.length > 0));
+      } else if (id && typeof id === 'string') {
+        targetIds.push(id);
+      } else if (req.query.id && typeof req.query.id === 'string') {
+        targetIds.push(req.query.id as string);
+      }
+
+      if (targetIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid application ID(s) provided for deletion' });
+      }
+
+      const uuidTargets = targetIds.filter(isUuid);
+      const refTargets = targetIds.filter((t) => !isUuid(t));
+
+      // 1. Fetch document and payment proof files from Supabase Storage
+      try {
+        const [stdDocsRes, directDocsRes, stdPayRes, directPayRes] = await Promise.all([
+          uuidTargets.length > 0
+            ? supabaseServer.from('application_documents').select('storage_path').in('application_id', uuidTargets)
+            : Promise.resolve({ data: [] }),
+          uuidTargets.length > 0
+            ? supabaseServer.from('direct_application_documents').select('storage_path').in('direct_application_id', uuidTargets)
+            : Promise.resolve({ data: [] }),
+          uuidTargets.length > 0
+            ? supabaseServer.from('application_payments').select('proof_storage_path, storage_path').in('application_id', uuidTargets)
+            : Promise.resolve({ data: [] }),
+          uuidTargets.length > 0
+            ? supabaseServer.from('direct_application_payments').select('proof_storage_path, storage_path').in('direct_application_id', uuidTargets)
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        const extractBucketKey = (raw?: string | null, bucket = 'applicant-vault') => {
+          if (!raw || typeof raw !== 'string') return null;
+          let p = raw.trim();
+          if (p.startsWith('data:') || p.startsWith('blob:')) return null;
+          if (p.includes('/api/vault/view')) {
+            try {
+              const urlObj = new URL(p, 'http://localhost');
+              const pathParam = urlObj.searchParams.get('path');
+              if (pathParam) p = decodeURIComponent(pathParam);
+            } catch (e) {}
+          }
+          if (p.includes(`/storage/v1/object/public/${bucket}/`)) {
+            p = p.split(`/storage/v1/object/public/${bucket}/`)[1] || p;
+          } else if (p.includes('/storage/v1/object/public/')) {
+            p = p.split('/storage/v1/object/public/')[1] || p;
+          }
+          if (p.startsWith(`${bucket}/`)) {
+            p = p.replace(new RegExp(`^${bucket}/`), '');
+          }
+          p = p.replace(/^\/+/, '');
+          if (p.startsWith('http://') || p.startsWith('https://')) return null;
+          return p.length > 0 ? p : null;
+        };
+
+        const allDocKeys = Array.from(
+          new Set(
+            [...(stdDocsRes.data || []), ...(directDocsRes.data || [])]
+              .map((d: any) => extractBucketKey(d.storage_path, 'applicant-vault'))
+              .filter(Boolean) as string[]
+          )
+        );
+
+        const allPayKeys = Array.from(
+          new Set(
+            [...(stdPayRes.data || []), ...(directPayRes.data || [])]
+              .map((p: any) => extractBucketKey(p.proof_storage_path || p.storage_path, 'payment-proofs-vault'))
+              .filter(Boolean) as string[]
+          )
+        );
+
+        if (allDocKeys.length > 0) {
+          const { error: docRemErr } = await supabaseServer.storage.from('applicant-vault').remove(allDocKeys);
+          if (docRemErr) console.warn('Applicant vault files removal note:', docRemErr.message);
+        }
+
+        if (allPayKeys.length > 0) {
+          const { error: payRemErr } = await supabaseServer.storage.from('payment-proofs-vault').remove(allPayKeys);
+          if (payRemErr) console.warn('Payment proofs storage removal note:', payRemErr.message);
+        }
+      } catch (storageErr) {
+        console.warn('Storage cleanup note during application delete:', storageErr);
+      }
+
+      // 2. Delete cascading documents & payments for standard and direct applications
+      await Promise.all([
+        uuidTargets.length > 0 ? supabaseServer.from('application_documents').delete().in('application_id', uuidTargets) : Promise.resolve(),
+        uuidTargets.length > 0 ? supabaseServer.from('application_payments').delete().in('application_id', uuidTargets) : Promise.resolve(),
+        uuidTargets.length > 0 ? supabaseServer.from('application_status_history').delete().in('application_id', uuidTargets) : Promise.resolve(),
+        uuidTargets.length > 0 ? supabaseServer.from('direct_application_documents').delete().in('direct_application_id', uuidTargets) : Promise.resolve(),
+        uuidTargets.length > 0 ? supabaseServer.from('direct_application_payments').delete().in('direct_application_id', uuidTargets) : Promise.resolve(),
+      ]);
+
+      // 2. Delete standard applications
+      if (uuidTargets.length > 0) {
+        await supabaseServer.from('rental_applications').delete().in('id', uuidTargets);
+        await supabaseServer.from('direct_rental_applications').delete().in('id', uuidTargets);
+      }
+      if (refTargets.length > 0) {
+        await supabaseServer.from('rental_applications').delete().in('application_ref', refTargets);
+        await supabaseServer.from('direct_rental_applications').delete().in('application_ref', refTargets);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${targetIds.length} rental application(s).`,
+        deletedCount: targetIds.length,
+        deletedIds: targetIds,
+      });
+    } catch (err: any) {
+      console.error('API /api/admin/applications DELETE error:', err);
       return res.status(500).json({ success: false, error: err.message });
     }
   }

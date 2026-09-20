@@ -307,5 +307,92 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // DELETE: Single or Bulk Payment Deletion (Provider payments + Application payments)
+  if (req.method === 'DELETE') {
+    try {
+      const { id, ids } = req.body || {};
+      const targetIds: string[] = [];
+
+      if (Array.isArray(ids) && ids.length > 0) {
+        targetIds.push(...ids.filter(isUuid));
+      } else if (id && isUuid(id)) {
+        targetIds.push(id);
+      } else if (req.query.id && isUuid(req.query.id as string)) {
+        targetIds.push(req.query.id as string);
+      }
+
+      if (targetIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid payment ID(s) provided for deletion' });
+      }
+
+      // 1. Fetch payment proof files to remove from payment-proofs-vault
+      try {
+        const [provPayRes, appPayRes, directPayRes] = await Promise.all([
+          supabaseServer.from('provider_payments').select('proof_storage_path').in('id', targetIds),
+          supabaseServer.from('application_payments').select('proof_storage_path, storage_path').in('id', targetIds),
+          supabaseServer.from('direct_application_payments').select('proof_storage_path, storage_path').in('id', targetIds),
+        ]);
+
+        const extractBucketKey = (raw?: string | null) => {
+          if (!raw || typeof raw !== 'string') return null;
+          let p = raw.trim();
+          if (p.startsWith('data:') || p.startsWith('blob:')) return null;
+          if (p.includes('/api/vault/view')) {
+            try {
+              const urlObj = new URL(p, 'http://localhost');
+              const pathParam = urlObj.searchParams.get('path');
+              if (pathParam) p = decodeURIComponent(pathParam);
+            } catch (e) {}
+          }
+          if (p.includes('/storage/v1/object/public/payment-proofs-vault/')) {
+            p = p.split('/storage/v1/object/public/payment-proofs-vault/')[1] || p;
+          } else if (p.includes('/storage/v1/object/public/')) {
+            p = p.split('/storage/v1/object/public/')[1] || p;
+          }
+          if (p.startsWith('payment-proofs-vault/')) {
+            p = p.replace(/^payment-proofs-vault\//, '');
+          }
+          p = p.replace(/^\/+/, '');
+          if (p.startsWith('http://') || p.startsWith('https://')) return null;
+          return p.length > 0 ? p : null;
+        };
+
+        const allProofKeys = Array.from(
+          new Set(
+            [
+              ...(provPayRes.data || []).map((r: any) => extractBucketKey(r.proof_storage_path)),
+              ...(appPayRes.data || []).map((r: any) => extractBucketKey(r.proof_storage_path || r.storage_path)),
+              ...(directPayRes.data || []).map((r: any) => extractBucketKey(r.proof_storage_path || r.storage_path)),
+            ].filter(Boolean) as string[]
+          )
+        );
+
+        if (allProofKeys.length > 0) {
+          const { error: remErr } = await supabaseServer.storage.from('payment-proofs-vault').remove(allProofKeys);
+          if (remErr) console.warn('Payment proofs storage removal note:', remErr.message);
+        }
+      } catch (storageErr) {
+        console.warn('Storage cleanup note during payment delete:', storageErr);
+      }
+
+      // 2. Delete database records
+      await Promise.all([
+        supabaseServer.from('provider_payments').delete().in('id', targetIds),
+        supabaseServer.from('application_payments').delete().in('id', targetIds),
+        supabaseServer.from('direct_application_payments').delete().in('id', targetIds),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${targetIds.length} payment record(s).`,
+        deletedCount: targetIds.length,
+        deletedIds: targetIds,
+      });
+    } catch (err: any) {
+      console.error('API /api/admin/payments DELETE error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   return res.status(405).json({ error: 'Method not allowed' });
 }

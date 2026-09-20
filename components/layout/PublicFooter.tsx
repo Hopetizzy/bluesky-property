@@ -323,10 +323,10 @@ export const PublicFooter: React.FC = () => {
           <div>
             © {new Date().getFullYear()} Blue Sky Property Management Worldwide LLC. All rights reserved. Equal Housing Opportunity.
           </div>
-          <div style={{ display: 'flex', gap: 20 }}>
-            <a href="#" style={{ color: '#94A3B8' }}>Privacy Policy</a>
-            <a href="#" style={{ color: '#94A3B8' }}>Terms of Service</a>
-            <a href="#" style={{ color: '#94A3B8' }}>Security Compliance</a>
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Link href="/privacy" style={{ color: '#94A3B8', textDecoration: 'none' }}>Privacy Policy</Link>
+            <Link href="/terms" style={{ color: '#94A3B8', textDecoration: 'none' }}>Terms of Service</Link>
+            <Link href="/policies" style={{ color: '#94A3B8', textDecoration: 'none' }}>Security Compliance</Link>
           </div>
         </div>
       </div>

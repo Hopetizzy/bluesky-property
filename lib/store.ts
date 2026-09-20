@@ -1150,6 +1150,60 @@ class DataStore {
     }
     this.setItem('application_payments', payments);
   }
+
+  // Deletion Helpers (Single & Bulk)
+  public deleteProperties(ids: string[]): void {
+    const idSet = new Set(ids);
+    const properties = this.getProperties().filter((p) => !idSet.has(p.id) && !idSet.has(p.slug));
+    this.setItem('properties', properties);
+  }
+
+  public deleteProperty(id: string): void {
+    this.deleteProperties([id]);
+  }
+
+  public deleteApplications(ids: string[]): void {
+    const idSet = new Set(ids);
+    const apps = this.getApplications().filter((a) => !idSet.has(a.id) && !idSet.has(a.application_ref));
+    this.setItem('applications', apps);
+  }
+
+  public deleteApplication(id: string): void {
+    this.deleteApplications([id]);
+  }
+
+  public deleteProviderPayments(ids: string[]): void {
+    const idSet = new Set(ids);
+    const payments = this.getProviderPayments().filter((p) => !idSet.has(p.id));
+    this.setItem('provider_payments', payments);
+  }
+
+  public deleteApplicationPayments(ids: string[]): void {
+    const idSet = new Set(ids);
+    const payments = this.getApplicationPayments().filter((p) => !idSet.has(p.id));
+    this.setItem('application_payments', payments);
+  }
+
+  // Admin Application Links
+  public getAdminApplicationLinks(): any[] {
+    return this.getItem<any[]>('admin_application_links', []);
+  }
+
+  public saveAdminApplicationLink(link: any): void {
+    const links = this.getAdminApplicationLinks();
+    const idx = links.findIndex((l) => l.id === link.id || l.token === link.token);
+    if (idx >= 0) {
+      links[idx] = link;
+    } else {
+      links.unshift(link);
+    }
+    this.setItem('admin_application_links', links);
+  }
+
+  public deleteAdminApplicationLink(idOrToken: string): void {
+    const links = this.getAdminApplicationLinks().filter((l) => l.id !== idOrToken && l.token !== idOrToken);
+    this.setItem('admin_application_links', links);
+  }
 }
 
 export const store = DataStore.getInstance();

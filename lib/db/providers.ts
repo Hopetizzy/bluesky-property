@@ -12,7 +12,7 @@ export interface ProviderAdminView {
   license: string;
   country: string;
   office_address?: string;
-  status: 'verified' | 'pending' | 'suspended';
+  status: 'verified' | 'pending' | 'suspended' | 'rejected' | string;
   planName: string;
   daysLeft: number;
   activePropertiesCount: number;

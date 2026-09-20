@@ -338,6 +338,93 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
+  // DELETE: Single or Bulk Property Deletion with Cascades
+  if (req.method === 'DELETE') {
+    try {
+      const { id, ids } = req.body || {};
+      const targetIds: string[] = [];
+
+      if (Array.isArray(ids) && ids.length > 0) {
+        targetIds.push(...ids.filter(isUuid));
+      } else if (id && isUuid(id)) {
+        targetIds.push(id);
+      } else if (req.query.id && isUuid(req.query.id as string)) {
+        targetIds.push(req.query.id as string);
+      }
+
+      if (targetIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid property ID(s) provided for deletion' });
+      }
+
+      // 1. Fetch images to delete from Supabase storage
+      try {
+        const { data: imgRows } = await supabaseServer
+          .from('property_images')
+          .select('storage_path')
+          .in('property_id', targetIds);
+
+        if (imgRows && imgRows.length > 0) {
+          const fileKeys = Array.from(
+            new Set(
+              imgRows
+                .map((r: any) => {
+                  if (!r.storage_path || typeof r.storage_path !== 'string') return null;
+                  let p = r.storage_path.trim();
+                  if (p.startsWith('data:') || p.startsWith('blob:')) return null;
+                  if (p.includes('/storage/v1/object/public/property-images/')) {
+                    p = p.split('/storage/v1/object/public/property-images/')[1] || p;
+                  }
+                  if (p.startsWith('property-images/')) {
+                    p = p.replace(/^property-images\//, '');
+                  }
+                  p = p.replace(/^\/+/, '');
+                  if (p.startsWith('http://') || p.startsWith('https://')) return null;
+                  return p.length > 0 ? p : null;
+                })
+                .filter(Boolean) as string[]
+            )
+          );
+
+          if (fileKeys.length > 0) {
+            const { error: storageErr } = await supabaseServer.storage.from('property-images').remove(fileKeys);
+            if (storageErr) {
+              console.warn('Property images storage removal note:', storageErr.message);
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage cleanup failed during property delete:', storageErr);
+      }
+
+      // 2. Delete associated child records (defensive cleanup)
+      await Promise.all([
+        supabaseServer.from('property_images').delete().in('property_id', targetIds),
+        supabaseServer.from('property_units').delete().in('property_id', targetIds),
+        supabaseServer.from('property_amenities').delete().in('property_id', targetIds),
+        supabaseServer.from('rental_applications').delete().in('property_id', targetIds),
+        supabaseServer.from('direct_rental_applications').delete().in('property_id', targetIds),
+      ]);
+
+      // 3. Delete properties
+      const { error: deleteErr } = await supabaseServer
+        .from('properties')
+        .delete()
+        .in('id', targetIds);
+
+      if (deleteErr) throw deleteErr;
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${targetIds.length} property item(s).`,
+        deletedCount: targetIds.length,
+        deletedIds: targetIds,
+      });
+    } catch (err: any) {
+      console.error('API /api/admin/properties DELETE error:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   return res.status(405).json({ error: 'Method not allowed' });
 }
 

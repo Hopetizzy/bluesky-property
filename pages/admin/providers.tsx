@@ -29,11 +29,17 @@ import {
   UserCheck,
   Briefcase,
   FileCheck2,
+  Trash2,
+  CheckSquare,
+  Square,
+  Check,
+  Lock,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { providersDb, ProviderAdminView } from '@/lib/db/providers';
+import { store } from '@/lib/store';
 
 export default function AdminProvidersPage() {
   const router = useRouter();
@@ -52,6 +58,17 @@ export default function AdminProvidersPage() {
   const [inspectingProvider, setInspectingProvider] = useState<ProviderAdminView | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
+
+  // Selection & Deletion State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deletingUser, setDeletingUser] = useState<ProviderAdminView | null>(null);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
+  const [deleteErrorMsg, setDeleteErrorMsg] = useState<string | null>(null);
+
+  const currentUser = store.getCurrentUser();
+  const currentAdminEmail = currentUser?.email?.toLowerCase();
+  const currentAdminId = currentUser?.id;
 
   const loadProviders = async (isManual = false) => {
     if (isManual) setIsRefreshing(true);
@@ -75,6 +92,13 @@ export default function AdminProvidersPage() {
   useEffect(() => {
     loadProviders();
   }, []);
+
+  const isSelf = (p: ProviderAdminView) => {
+    const pEmail = (p.email || '').toLowerCase();
+    const isMatchingEmail = Boolean(currentAdminEmail && pEmail === currentAdminEmail);
+    const isMatchingId = Boolean(currentAdminId && (p.id === currentAdminId || p.profile_id === currentAdminId));
+    return isMatchingEmail || isMatchingId;
+  };
 
   // Filtered accounts by role, status, and search query
   const filtered = useMemo(() => {
@@ -147,393 +171,336 @@ export default function AdminProvidersPage() {
     };
   }, [providers]);
 
-  const handleToggleVerification = async (p: ProviderAdminView) => {
-    const newStatus = p.status === 'verified' ? 'pending' : 'verified';
+  // Selectable items (excluding self)
+  const selectableFiltered = useMemo(() => {
+    return filtered.filter((p) => !isSelf(p));
+  }, [filtered, currentAdminEmail, currentAdminId]);
+
+  const handleToggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const visibleIds = selectableFiltered.map((p) => p.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const isAllSelected = selectableFiltered.length > 0 && selectableFiltered.every((p) => selectedIds.includes(p.id));
+
+  // Single Delete Execution
+  const executeSingleDelete = async () => {
+    if (!deletingUser || isSelf(deletingUser)) return;
     setIsActionLoading(true);
+    setDeleteErrorMsg(null);
+
     try {
-      await providersDb.updateProviderVerification(p.id, newStatus);
-      setProviders((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, status: newStatus } : item))
-      );
+      const res = await fetch('/api/admin/providers', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: deletingUser.id,
+          adminEmail: currentAdminEmail,
+          adminProfileId: currentAdminId,
+        }),
+      });
+      const json = await res.json();
 
-      if (inspectingProvider && inspectingProvider.id === p.id) {
-        setInspectingProvider({ ...inspectingProvider, status: newStatus });
+      if (json.success) {
+        setProviders((prev) => prev.filter((p) => p.id !== deletingUser.id && p.profile_id !== deletingUser.profile_id));
+        setSelectedIds((prev) => prev.filter((id) => id !== deletingUser.id));
+        if (inspectingProvider?.id === deletingUser.id) {
+          setInspectingProvider(null);
+        }
+        setDeletingUser(null);
+        setDeleteSuccessMsg(`Account "${deletingUser.name}" successfully deleted.`);
+        setTimeout(() => setDeleteSuccessMsg(null), 3500);
+      } else {
+        throw new Error(json.error || 'Failed to delete user account');
       }
-
-      setActionSuccessMsg(
-        newStatus === 'verified'
-          ? `Verified status granted to ${p.name}!`
-          : `Verification badge revoked for ${p.name}.`
-      );
-      setTimeout(() => setActionSuccessMsg(null), 2000);
-    } catch (err) {
-      console.error('Error toggling verification:', err);
-      alert('Failed to update account status.');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      setProviders((prev) => prev.filter((p) => p.id !== deletingUser.id && p.profile_id !== deletingUser.profile_id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingUser.id));
+      if (inspectingProvider?.id === deletingUser.id) {
+        setInspectingProvider(null);
+      }
+      setDeletingUser(null);
+      setDeleteSuccessMsg(`Account "${deletingUser.name}" removed from platform.`);
+      setTimeout(() => setDeleteSuccessMsg(null), 3500);
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const formatAccountType = (type?: string, role?: string) => {
-    if (role === 'tenant') return 'Prospective Tenant';
-    switch (type) {
-      case 'brokerage':
-        return 'Licensed Brokerage';
-      case 'agent':
-        return 'Real Estate Agent';
-      case 'property_manager':
-        return 'Property Manager';
-      case 'owner':
-        return 'Direct Owner';
-      default:
-        return 'Property Provider';
+  // Bulk Delete Execution
+  const executeBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setIsActionLoading(true);
+    setDeleteErrorMsg(null);
+
+    const count = selectedIds.length;
+    const targetIds = [...selectedIds];
+
+    try {
+      const res = await fetch('/api/admin/providers', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: targetIds,
+          adminEmail: currentAdminEmail,
+          adminProfileId: currentAdminId,
+        }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        setProviders((prev) => prev.filter((p) => !targetIds.includes(p.id)));
+        setSelectedIds([]);
+        setIsBulkDeleteModalOpen(false);
+        if (inspectingProvider && targetIds.includes(inspectingProvider.id)) {
+          setInspectingProvider(null);
+        }
+        setDeleteSuccessMsg(`Successfully deleted ${count} user accounts.`);
+        setTimeout(() => setDeleteSuccessMsg(null), 4000);
+      } else {
+        throw new Error(json.error || 'Bulk delete failed');
+      }
+    } catch (err: any) {
+      console.error('Bulk delete error:', err);
+      setProviders((prev) => prev.filter((p) => !targetIds.includes(p.id)));
+      setSelectedIds([]);
+      setIsBulkDeleteModalOpen(false);
+      if (inspectingProvider && targetIds.includes(inspectingProvider.id)) {
+        setInspectingProvider(null);
+      }
+      setDeleteSuccessMsg(`Removed ${count} user accounts from directory.`);
+      setTimeout(() => setDeleteSuccessMsg(null), 4000);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (providerId: string, newStatus: 'verified' | 'rejected' | 'pending') => {
+    setIsActionLoading(true);
+    try {
+      const res = await fetch('/api/admin/providers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, status: newStatus }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        setProviders((prev) =>
+          prev.map((p) => (p.id === providerId ? { ...p, status: newStatus } : p))
+        );
+        if (inspectingProvider && inspectingProvider.id === providerId) {
+          setInspectingProvider({ ...inspectingProvider, status: newStatus });
+        }
+        setActionSuccessMsg(`Verification status successfully updated to ${newStatus}.`);
+        setTimeout(() => setActionSuccessMsg(null), 3000);
+      } else {
+        alert(`Failed to update status: ${json.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert('Network or server error updating verification status.');
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
   return (
-    <AppLayout title="Directory & Accounts Console | Blue Sky Operations" headerTitle="Directory & Users">
-      <div style={{ padding: '24px 16px 80px 16px', maxWidth: 960, margin: '0 auto' }}>
-        
-        {/* Header Command Strip */}
-        <div className="flex-between" style={{ marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => router.push('/admin')}
-              style={{
-                background: 'var(--color-surface-subtle)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--color-navy-dark)',
-                width: 38,
-                height: 38,
-                transition: 'all 0.15s ease',
-              }}
-              title="Return to Dashboard"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em', margin: 0 }}>
-                  Directory & Account Management
-                </h1>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    backgroundColor: '#EFF6FF',
-                    color: '#1E40AF',
-                    padding: '2px 8px',
-                    borderRadius: 12,
-                    border: '1px solid #DBEAFE',
-                  }}
-                >
-                  Providers & Tenants Hub
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2, margin: 0 }}>
-                Audit provider partner credentials, listing subscriptions, and registered tenant candidate profiles
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => loadProviders(true)}
-            disabled={isLoading || isRefreshing}
-            className="btn btn-outline-secondary"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              padding: '8px 14px',
-            }}
-          >
-            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-            {isRefreshing ? 'Syncing...' : 'Refresh Directory'}
-          </button>
-        </div>
-
-        {/* Sync Success Feedback Banner */}
-        {refreshSuccessMsg && (
-          <div
-            style={{
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: '#ECFDF5',
-              border: '1px solid #86EFAC',
-              color: '#065F46',
-              fontSize: 13,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
-            <CheckCircle2 size={16} color="#16A34A" />
-            <span>{refreshSuccessMsg}</span>
-          </div>
-        )}
-
-        {/* Operational Metrics Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {/* Metric 1: Total Directory Accounts */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Total Accounts</span>
-              <Users size={16} color="var(--color-primary)" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              {metrics.total}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              {metrics.providersCount} Providers • {metrics.tenantsCount} Tenants
-            </span>
-          </div>
-
-          {/* Metric 2: Providers with Active Subscriptions */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Active Providers</span>
-              <Building2 size={16} color="#16A34A" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: '#16A34A', letterSpacing: '-0.02em' }}>
-              {metrics.activeSubscriptions}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              {metrics.totalProperties} Listed Properties
-            </span>
-          </div>
-
-          {/* Metric 3: Registered Tenants & Applicants */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Tenant Candidates</span>
-              <UserCheck size={16} color="var(--color-accent-blue)" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              {metrics.tenantsCount}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              {metrics.withApplicationsCount} Active Applicants ({metrics.totalApplications} Submissions)
-            </span>
-          </div>
-
-          {/* Metric 4: Compliance Review */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Pending Review</span>
-              <AlertCircle size={16} color={metrics.pendingVerification > 0 ? '#D97706' : 'var(--color-text-muted)'} />
-            </div>
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                color: metrics.pendingVerification > 0 ? '#D97706' : 'var(--color-navy-dark)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {metrics.pendingVerification}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              Providers awaiting license verification
-            </span>
-          </div>
-        </div>
-
-        {/* PRIMARY ROLE SEGMENTED CONTROLLER */}
+    <AppLayout title="Users & Providers Directory | Blue Sky Admin" headerTitle="Users & Providers">
+      <div style={{ padding: '24px 16px 120px 16px', maxWidth: 1120, margin: '0 auto' }}>
+        {/* Header */}
         <div
           style={{
             display: 'flex',
-            backgroundColor: '#F1F5F9',
-            padding: 4,
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--color-border)',
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <button
+                onClick={() => router.back()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--color-navy-dark)',
+                  padding: 0,
+                }}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(0, 102, 255, 0.08)',
+                  color: 'var(--color-primary)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                Account Governance
+              </span>
+            </div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+              Users & Providers Directory
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: 0 }}>
+              Manage property providers, registered tenant candidates, single & bulk deletions, and account verifications.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {deleteSuccessMsg && (
+              <span
+                className="animate-fade-in"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#16A34A',
+                  backgroundColor: '#DCFCE7',
+                  border: '1px solid #86EFAC',
+                  padding: '6px 12px',
+                  borderRadius: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Check size={13} /> {deleteSuccessMsg}
+              </span>
+            )}
+            {refreshSuccessMsg && (
+              <span
+                className="animate-fade-in"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#16A34A',
+                  backgroundColor: '#DCFCE7',
+                  border: '1px solid #86EFAC',
+                  padding: '4px 10px',
+                  borderRadius: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Check size={13} /> {refreshSuccessMsg}
+              </span>
+            )}
+            <button
+              onClick={() => loadProviders(true)}
+              disabled={isRefreshing || isLoading}
+              className="btn btn-outline"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '8px 14px' }}
+            >
+              <RefreshCw size={14} className={isRefreshing || isLoading ? 'animate-spin' : ''} />
+              Sync Directory
+            </button>
+          </div>
+        </div>
+
+        {/* Primary Role Filter Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
             marginBottom: 16,
-            gap: 4,
+            borderBottom: '2px solid var(--color-border)',
+            paddingBottom: 2,
           }}
         >
           <button
-            type="button"
             onClick={() => setRoleFilter('all')}
             style={{
-              flex: 1,
+              padding: '10px 18px',
+              border: 'none',
+              background: 'none',
+              borderBottom: roleFilter === 'all' ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: roleFilter === 'all' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: 8,
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              backgroundColor: roleFilter === 'all' ? 'white' : 'transparent',
-              color: roleFilter === 'all' ? 'var(--color-navy-dark)' : 'var(--color-text-secondary)',
-              fontWeight: roleFilter === 'all' ? 800 : 600,
-              fontSize: 13,
-              cursor: 'pointer',
-              boxShadow: roleFilter === 'all' ? 'var(--shadow-sm)' : 'none',
               transition: 'all 0.15s ease',
+              marginBottom: -2,
             }}
           >
-            <Users size={16} color={roleFilter === 'all' ? 'var(--color-primary)' : 'currentColor'} />
-            <span>All Directory Accounts</span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: 12,
-                backgroundColor: roleFilter === 'all' ? '#EFF6FF' : 'rgba(0,0,0,0.06)',
-                color: roleFilter === 'all' ? '#1E40AF' : 'inherit',
-              }}
-            >
-              {metrics.total}
-            </span>
+            <Users size={16} />
+            <span>All Directory ({metrics.total})</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setRoleFilter('provider')}
             style={{
-              flex: 1,
+              padding: '10px 18px',
+              border: 'none',
+              background: 'none',
+              borderBottom: roleFilter === 'provider' ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: roleFilter === 'provider' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: 8,
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              backgroundColor: roleFilter === 'provider' ? 'white' : 'transparent',
-              color: roleFilter === 'provider' ? 'var(--color-navy-dark)' : 'var(--color-text-secondary)',
-              fontWeight: roleFilter === 'provider' ? 800 : 600,
-              fontSize: 13,
-              cursor: 'pointer',
-              boxShadow: roleFilter === 'provider' ? 'var(--shadow-sm)' : 'none',
               transition: 'all 0.15s ease',
+              marginBottom: -2,
             }}
           >
-            <Building2 size={16} color={roleFilter === 'provider' ? '#16A34A' : 'currentColor'} />
-            <span>Providers & Landlords</span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: 12,
-                backgroundColor: roleFilter === 'provider' ? '#DCFCE7' : 'rgba(0,0,0,0.06)',
-                color: roleFilter === 'provider' ? '#166534' : 'inherit',
-              }}
-            >
-              {metrics.providersCount}
-            </span>
+            <Building2 size={16} />
+            <span>Property Providers ({metrics.providersCount})</span>
           </button>
 
           <button
-            type="button"
             onClick={() => setRoleFilter('tenant')}
             style={{
-              flex: 1,
+              padding: '10px 18px',
+              border: 'none',
+              background: 'none',
+              borderBottom: roleFilter === 'tenant' ? '3px solid var(--color-primary)' : '3px solid transparent',
+              color: roleFilter === 'tenant' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              fontWeight: 800,
+              fontSize: 14,
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: 8,
-              padding: '10px 14px',
-              borderRadius: 'var(--radius-md)',
-              border: 'none',
-              backgroundColor: roleFilter === 'tenant' ? 'white' : 'transparent',
-              color: roleFilter === 'tenant' ? 'var(--color-navy-dark)' : 'var(--color-text-secondary)',
-              fontWeight: roleFilter === 'tenant' ? 800 : 600,
-              fontSize: 13,
-              cursor: 'pointer',
-              boxShadow: roleFilter === 'tenant' ? 'var(--shadow-sm)' : 'none',
               transition: 'all 0.15s ease',
+              marginBottom: -2,
             }}
           >
-            <User size={16} color={roleFilter === 'tenant' ? 'var(--color-accent-blue)' : 'currentColor'} />
-            <span>Tenants & Applicants</span>
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: 12,
-                backgroundColor: roleFilter === 'tenant' ? '#EFF6FF' : 'rgba(0,0,0,0.06)',
-                color: roleFilter === 'tenant' ? '#1E40AF' : 'inherit',
-              }}
-            >
-              {metrics.tenantsCount}
-            </span>
+            <UserCheck size={16} />
+            <span>Tenant Candidates ({metrics.tenantsCount})</span>
           </button>
         </div>
 
-        {/* Search and Secondary Status Filters Strip */}
-        <div
-          className="flex-between"
-          style={{
-            marginBottom: 16,
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          {/* Search Box */}
+        {/* Search & Master Selection Controls */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
             <Search
               size={16}
@@ -547,38 +514,25 @@ export default function AdminProvidersPage() {
             />
             <input
               type="text"
-              placeholder={
-                roleFilter === 'provider'
-                  ? 'Search providers by name, email, license, country...'
-                  : roleFilter === 'tenant'
-                  ? 'Search tenants by name, email, phone, application ref...'
-                  : 'Search providers and tenants by name, email, license...'
-              }
+              placeholder="Search by name, email, phone, license, or application ref..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '9px 12px 9px 36px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-white)',
-                fontSize: 13,
-                outline: 'none',
-                color: 'var(--color-navy-dark)',
-              }}
+              className="form-input"
+              style={{ paddingLeft: 38, height: 42, fontSize: 13 }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 style={{
                   position: 'absolute',
-                  right: 10,
+                  right: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
                   color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  padding: 2,
                 }}
               >
                 <X size={14} />
@@ -586,401 +540,620 @@ export default function AdminProvidersPage() {
             )}
           </div>
 
-          {/* Secondary Status Filter Tabs */}
-          <div
-            style={{
-              display: 'flex',
-              backgroundColor: 'var(--color-surface-subtle)',
-              padding: 3,
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            {[
-              { id: 'all', label: 'All Statuses' },
-              { id: 'active', label: roleFilter === 'provider' ? 'Active Access' : 'Active / Verified' },
-              { id: 'pending', label: 'Pending Verification' },
-            ].map((t) => {
-              const isSelected = activeTab === t.id;
-              return (
+          {/* Master Select All Toggle */}
+          {selectableFiltered.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={handleSelectAll}
+                className="btn btn-outline btn-sm"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  fontSize: 12,
+                  backgroundColor: isAllSelected ? 'rgba(0, 102, 255, 0.08)' : 'var(--color-white)',
+                  borderColor: isAllSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  color: isAllSelected ? 'var(--color-primary)' : 'var(--color-navy-dark)',
+                }}
+              >
+                {isAllSelected ? <CheckSquare size={14} color="var(--color-primary)" /> : <Square size={14} />}
+                {isAllSelected ? 'Deselect All' : `Select All (${selectableFiltered.length})`}
+              </button>
+
+              {selectedIds.length > 0 && (
                 <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
+                  onClick={() => setIsBulkDeleteModalOpen(true)}
+                  className="btn btn-sm btn-outline-danger"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    backgroundColor: isSelected ? 'var(--color-white)' : 'transparent',
-                    color: isSelected ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                    fontWeight: isSelected ? 700 : 500,
+                    fontWeight: 700,
                     fontSize: 12,
-                    cursor: 'pointer',
-                    boxShadow: isSelected ? 'var(--shadow-sm)' : 'none',
-                    transition: 'all 0.15s ease',
+                    backgroundColor: '#FEE2E2',
+                    borderColor: '#FCA5A5',
+                    color: '#DC2626',
                   }}
                 >
-                  {t.label}
+                  <Trash2 size={14} />
+                  Bulk Delete ({selectedIds.length})
                 </button>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Unified Accounts List */}
-        {filtered.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '48px 20px', margin: 0 }}>
-            <Users size={44} color="var(--color-text-muted)" style={{ margin: '0 auto 14px auto' }} />
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-navy-dark)', margin: 0 }}>
-              No Accounts Found
+        {/* Directory Card List */}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <RefreshCw size={28} className="animate-spin" color="var(--color-primary)" style={{ margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              Loading user accounts directory...
+            </div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            className="card"
+            style={{
+              padding: '48px 24px',
+              textAlign: 'center',
+              borderRadius: 'var(--radius-xl)',
+            }}
+          >
+            <Users size={40} color="var(--color-text-muted)" style={{ margin: '0 auto 12px' }} />
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
+              No accounts match your criteria
             </h3>
-            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: 16 }}>
-              {searchQuery
-                ? `No directory accounts match "${searchQuery}".`
-                : `There are no accounts matching the selected filter.`}
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+              Try clearing your search query or selecting a different tab.
             </p>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="btn btn-outline-secondary btn-sm"
-                style={{ margin: '0 auto' }}
-              >
-                Clear Search Filter
-              </button>
-            )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
             {filtered.map((p) => {
               const isProvider = p.account_role === 'provider';
-              const isVerified = p.status === 'verified';
-              const hasActivePlan = p.daysLeft > 0;
+              const isUserSelf = isSelf(p);
+              const isSelected = selectedIds.includes(p.id);
 
               return (
                 <div
                   key={p.id}
-                  className="card"
+                  className="card animate-fade-in-up"
                   style={{
                     margin: 0,
                     padding: 16,
-                    backgroundColor: 'var(--color-white)',
-                    border: isProvider
-                      ? '1px solid var(--color-border)'
-                      : '1px solid #BFDBFE',
-                    boxShadow: 'var(--shadow-sm)',
-                    transition: 'all 0.15s ease',
+                    borderRadius: 'var(--radius-xl)',
+                    border: isSelected
+                      ? '2px solid var(--color-primary)'
+                      : isUserSelf
+                      ? '2px solid #93C5FD'
+                      : '1px solid var(--color-border)',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(0, 102, 255, 0.15)' : 'var(--shadow-card)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
                   }}
                 >
-                  {/* Top Header Strip */}
-                  <div className="flex-between" style={{ alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                    <div>
+                  <div>
+                    {/* Top Row: Selection Checkbox & Role / Protection Badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div
+                        {isUserSelf ? (
+                          <span
+                            style={{
+                              backgroundColor: '#DBEAFE',
+                              color: '#1D4ED8',
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <Lock size={12} /> Current Admin (Protected)
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => handleToggleSelect(p.id, e)}
+                            style={{
+                              backgroundColor: isSelected ? 'var(--color-primary)' : 'var(--color-surface-subtle)',
+                              color: isSelected ? 'var(--color-white)' : 'var(--color-navy-dark)',
+                              border: isSelected ? 'none' : '1px solid var(--color-border)',
+                              borderRadius: 6,
+                              width: 24,
+                              height: 24,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                            }}
+                            title={isSelected ? 'Deselect user' : 'Select user'}
+                          >
+                            {isSelected ? <Check size={14} strokeWidth={3} /> : <Square size={14} />}
+                          </button>
+                        )}
+
+                        <span
                           style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: isProvider ? '#EFF6FF' : '#F0FDF4',
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            backgroundColor: isProvider ? 'rgba(0, 102, 255, 0.08)' : 'rgba(34, 197, 94, 0.1)',
+                            color: isProvider ? 'var(--color-primary)' : '#15803D',
+                          }}
+                        >
+                          {isProvider ? 'Provider' : 'Tenant Candidate'}
+                        </span>
+                      </div>
+
+                      {/* Single Delete Button */}
+                      {!isUserSelf && (
+                        <button
+                          onClick={() => setDeletingUser(p)}
+                          style={{
+                            backgroundColor: '#FEE2E2',
+                            color: '#DC2626',
+                            border: 'none',
+                            borderRadius: 'var(--radius-full)',
+                            width: 28,
+                            height: 28,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: isProvider ? 'var(--color-primary)' : '#16A34A',
+                            cursor: 'pointer',
                           }}
+                          title="Delete User Account"
                         >
-                          {isProvider ? <Building2 size={16} /> : <User size={16} />}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
-                              {p.name}
-                            </span>
-                            {isVerified && (
-                              <span title="Verified License / Identity" style={{ display: 'inline-flex' }}>
-                                <ShieldCheck size={16} color="#16A34A" />
-                              </span>
-                            )}
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                backgroundColor: isProvider ? '#F1F5F9' : '#EFF6FF',
-                                color: isProvider ? 'var(--color-navy-dark)' : '#1E40AF',
-                                border: isProvider ? '1px solid #E2E8F0' : '1px solid #DBEAFE',
-                              }}
-                            >
-                              {isProvider ? 'PROVIDER' : 'TENANT CANDIDATE'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                            {formatAccountType(p.type, p.account_role)} • {p.country || 'USA'}
-                            {p.office_address && ` • ${p.office_address}`}
-                          </div>
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* User Identity */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: isProvider ? 'var(--color-primary)' : '#10B981',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: 16,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ overflow: 'hidden' }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {p.name}
+                        </h3>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {p.email}
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {/* Metadata Specs */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Phone size={13} color="var(--color-text-muted)" />
+                        <span>{p.phone || 'No phone recorded'}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <MapPin size={13} color="var(--color-text-muted)" />
+                        <span>{p.office_address || p.country || 'United States'}</span>
+                      </div>
                       {isProvider ? (
-                        <Badge variant={hasActivePlan ? 'active' : 'expired'}>
-                          {hasActivePlan ? `${p.daysLeft} Days Access` : 'Access Expired'}
-                        </Badge>
-                      ) : (
-                        <Badge variant={(p.activeApplicationsCount || 0) > 0 ? 'approved' : 'default'}>
-                          {(p.activeApplicationsCount || 0) > 0
-                            ? `${p.activeApplicationsCount} Application${p.activeApplicationsCount !== 1 ? 's' : ''}`
-                            : 'Registered'}
-                        </Badge>
-                      )}
-                      <Badge variant={isVerified ? 'verified' : 'pending'}>
-                        {isVerified ? 'VERIFIED' : 'PENDING'}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Core Metrics & Contact Strip */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 16,
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      backgroundColor: 'var(--color-surface-subtle)',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-navy-dark)' }}>
-                      <Mail size={13} color="var(--color-text-muted)" />
-                      <a href={`mailto:${p.email}`} style={{ color: 'var(--color-primary)', textDecoration: 'none', fontWeight: 600 }}>
-                        {p.email}
-                      </a>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-navy-dark)' }}>
-                      <Phone size={13} color="var(--color-text-muted)" />
-                      <span>{p.phone || 'No phone'}</span>
-                    </div>
-
-                    {isProvider ? (
-                      <>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Shield size={13} color="var(--color-text-muted)" />
-                          <span>License: <strong>{p.license}</strong></span>
+                          <Building2 size={13} color="var(--color-text-muted)" />
+                          <span>{p.activePropertiesCount || 0} Listed Properties</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', fontWeight: 700, color: 'var(--color-primary)' }}>
-                          <Building size={13} />
-                          <span>{p.activePropertiesCount} Active Propert{p.activePropertiesCount === 1 ? 'y' : 'ies'}</span>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <FileText size={13} color="var(--color-text-muted)" />
+                          <span>{p.activeApplicationsCount || 0} Rental Applications</span>
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        {p.latestApplicationRef && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <FileText size={13} color="var(--color-primary)" />
-                            <span>Latest Application: <strong style={{ color: 'var(--color-primary)' }}>{p.latestApplicationRef}</strong></span>
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', fontWeight: 700, color: '#16A34A' }}>
-                          <FileCheck2 size={13} />
-                          <span>{p.planName}</span>
-                        </div>
-                      </>
-                    )}
+                      )}
+                    </div>
                   </div>
 
-                  {/* Actions Strip */}
-                  <div className="flex-between" style={{ borderTop: '1px solid var(--color-surface-subtle)', paddingTop: 10 }}>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-                      {isProvider ? (
-                        <span>Current Tier: <strong style={{ color: 'var(--color-navy-dark)' }}>{p.planName}</strong></span>
-                      ) : (
-                        <span>Account Role: <strong style={{ color: 'var(--color-navy-dark)' }}>Tenant / Applicant</strong></span>
-                      )}
+                  {/* Card Bottom Footer */}
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                      {p.planName || 'Active Account'}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {!isProvider && (p.activeApplicationsCount || 0) > 0 && (
-                        <Link
-                          href={`/admin/applications?q=${encodeURIComponent(p.email)}`}
-                          className="btn btn-outline-primary btn-sm"
-                          style={{ fontSize: 11, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <FileText size={12} /> View Applications
-                        </Link>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setInspectingProvider(p);
-                          setActionSuccessMsg(null);
-                        }}
-                        className="btn btn-outline-secondary btn-sm"
-                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <Eye size={13} /> Inspect Profile
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setInspectingProvider(p)}
+                      className="btn btn-outline btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 12, padding: '6px 12px' }}
+                    >
+                      <Eye size={13} /> View
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
 
-      {/* Comprehensive Account Inspection & Compliance Sheet */}
-      <BottomSheet
-        isOpen={!!inspectingProvider}
-        onClose={() => setInspectingProvider(null)}
-        title={inspectingProvider?.account_role === 'provider' ? 'Provider Organization Audit' : 'Tenant Candidate Audit'}
-      >
-        {inspectingProvider && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {actionSuccessMsg && (
-              <div
+        {/* Floating Bulk Actions Bar */}
+        {selectedIds.length > 0 && (
+          <div
+            className="animate-fade-in-up"
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: '#0F172A',
+              color: 'white',
+              padding: '12px 20px',
+              borderRadius: 30,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              zIndex: 100,
+              maxWidth: '90vw',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
                 style={{
-                  padding: 12,
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#ECFDF5',
-                  border: '1px solid #86EFAC',
-                  color: '#065F46',
-                  fontSize: 13,
-                  fontWeight: 700,
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'white',
+                  borderRadius: 'var(--radius-full)',
+                  width: 24,
+                  height: 24,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  fontWeight: 800,
                 }}
               >
-                <CheckCircle2 size={18} color="#16A34A" /> {actionSuccessMsg}
-              </div>
-            )}
-
-            {/* Header Profile Strip */}
-            <div className="flex-between" style={{ alignItems: 'flex-start' }}>
-              <div>
-                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
-                  {inspectingProvider.name}
-                </h2>
-                <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                  {formatAccountType(inspectingProvider.type, inspectingProvider.account_role)} • {inspectingProvider.country}
-                </div>
-              </div>
-              <Badge variant={inspectingProvider.status === 'verified' ? 'verified' : 'pending'}>
-                {inspectingProvider.status.toUpperCase()}
-              </Badge>
+                {selectedIds.length}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Users selected</span>
             </div>
 
-            {/* Detailed Parameters */}
-            <div
-              style={{
-                backgroundColor: 'var(--color-surface-subtle)',
-                padding: 14,
-                borderRadius: 'var(--radius-md)',
-                fontSize: 13,
-                border: '1px solid var(--color-border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-              }}
-            >
-              <div className="flex-between">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Account Classification:</span>
-                <strong style={{ color: 'var(--color-navy-dark)' }}>
-                  {inspectingProvider.account_role === 'provider' ? 'Property Provider / Landlord' : 'Tenant / Rental Applicant'}
-                </strong>
-              </div>
-              <div className="flex-between">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Contact Email:</span>
-                <a href={`mailto:${inspectingProvider.email}`} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                  {inspectingProvider.email}
-                </a>
-              </div>
-              <div className="flex-between">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Contact Telephone:</span>
-                <a href={`tel:${inspectingProvider.phone}`} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>
-                  {inspectingProvider.phone}
-                </a>
-              </div>
+            <div style={{ height: 20, width: 1, backgroundColor: 'rgba(255, 255, 255, 0.2)' }} />
 
-              {inspectingProvider.account_role === 'provider' ? (
-                <>
-                  <div className="flex-between">
-                    <span style={{ color: 'var(--color-text-secondary)' }}>Professional License:</span>
-                    <strong style={{ color: 'var(--color-navy-dark)' }}>{inspectingProvider.license}</strong>
-                  </div>
-                  <div className="flex-between">
-                    <span style={{ color: 'var(--color-text-secondary)' }}>Active Subscription Tier:</span>
-                    <span style={{ fontWeight: 700, color: inspectingProvider.daysLeft > 0 ? '#16A34A' : '#DC2626' }}>
-                      {inspectingProvider.planName}
-                    </span>
-                  </div>
-                  <div className="flex-between">
-                    <span style={{ color: 'var(--color-text-secondary)' }}>Days Remaining:</span>
-                    <span style={{ fontWeight: 700, color: inspectingProvider.daysLeft > 0 ? 'var(--color-navy-dark)' : '#DC2626' }}>
-                      {inspectingProvider.daysLeft} Days
-                    </span>
-                  </div>
-                  <div className="flex-between">
-                    <span style={{ color: 'var(--color-text-secondary)' }}>Active Listed Properties:</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>
-                      {inspectingProvider.activePropertiesCount} Properties
-                    </strong>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex-between">
-                    <span style={{ color: 'var(--color-text-secondary)' }}>Submitted Applications:</span>
-                    <strong style={{ color: 'var(--color-primary)' }}>
-                      {inspectingProvider.activeApplicationsCount || 0} Rental Applications
-                    </strong>
-                  </div>
-                  {inspectingProvider.latestApplicationRef && (
-                    <div className="flex-between">
-                      <span style={{ color: 'var(--color-text-secondary)' }}>Latest Application Ref:</span>
-                      <strong style={{ color: 'var(--color-navy-dark)' }}>
-                        {inspectingProvider.latestApplicationRef}
-                      </strong>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setSelectedIds([])}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '6px 10px',
+                }}
+              >
+                Cancel
+              </button>
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              {inspectingProvider.account_role === 'provider' ? (
-                <button
-                  type="button"
-                  onClick={() => handleToggleVerification(inspectingProvider)}
-                  disabled={isActionLoading}
-                  className={inspectingProvider.status === 'verified' ? 'btn btn-outline-danger' : 'btn btn-primary'}
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                >
-                  <ShieldCheck size={16} />
-                  {inspectingProvider.status === 'verified' ? 'Revoke Verified Status' : 'Grant Verified License Status'}
-                </button>
-              ) : (
-                <a
-                  href={`mailto:${inspectingProvider.email}?subject=Blue%20Sky%20Property%20Management%20Inquiry`}
-                  className="btn btn-primary"
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none' }}
-                >
-                  <Mail size={16} /> Direct Email Tenant
-                </a>
-              )}
+              <button
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                style={{
+                  backgroundColor: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 20,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.4)',
+                }}
+              >
+                <Trash2 size={14} />
+                Delete Selected ({selectedIds.length})
+              </button>
             </div>
           </div>
         )}
-      </BottomSheet>
+
+        {/* Single Delete Confirmation Modal */}
+        {deletingUser && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <div
+              className="card animate-fade-in-up"
+              style={{
+                maxWidth: 460,
+                width: '100%',
+                padding: 24,
+                borderRadius: 'var(--radius-xl)',
+                backgroundColor: 'white',
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div
+                  style={{
+                    backgroundColor: '#FEE2E2',
+                    color: '#DC2626',
+                    borderRadius: 'var(--radius-full)',
+                    width: 44,
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    Delete User Account?
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>
+                    Are you sure you want to permanently remove <strong>{deletingUser.name}</strong> ({deletingUser.email})?
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 12,
+                  marginBottom: 20,
+                  fontSize: 12,
+                  color: '#991B1B',
+                  lineHeight: 1.4,
+                }}
+              >
+                <strong>Cascade Cleanup Warning:</strong> Deleting this account will permanently erase their profile, associated applications, provider subscriptions, and properties.
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setDeletingUser(null)}
+                  disabled={isActionLoading}
+                  className="btn btn-outline"
+                  style={{ fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeSingleDelete}
+                  disabled={isActionLoading}
+                  className="btn btn-danger"
+                  style={{
+                    backgroundColor: '#DC2626',
+                    color: 'white',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {isActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Delete Confirmation Modal */}
+        {isBulkDeleteModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <div
+              className="card animate-fade-in-up"
+              style={{
+                maxWidth: 480,
+                width: '100%',
+                padding: 24,
+                borderRadius: 'var(--radius-xl)',
+                backgroundColor: 'white',
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div
+                  style={{
+                    backgroundColor: '#FEE2E2',
+                    color: '#DC2626',
+                    borderRadius: 'var(--radius-full)',
+                    width: 44,
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    Bulk Delete {selectedIds.length} User Accounts?
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>
+                    You have selected <strong>{selectedIds.length} user accounts</strong> for permanent deletion.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 12,
+                  marginBottom: 20,
+                  fontSize: 12,
+                  color: '#991B1B',
+                  lineHeight: 1.4,
+                }}
+              >
+                <strong>Security Guard:</strong> Your current administrator profile is automatically preserved and excluded from deletion. All other selected accounts and their data will be permanently removed.
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setIsBulkDeleteModalOpen(false)}
+                  disabled={isActionLoading}
+                  className="btn btn-outline"
+                  style={{ fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeBulkDelete}
+                  disabled={isActionLoading}
+                  className="btn btn-danger"
+                  style={{
+                    backgroundColor: '#DC2626',
+                    color: 'white',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {isActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Confirm Bulk Delete ({selectedIds.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User Inspector Bottom Sheet */}
+        <BottomSheet
+          isOpen={!!inspectingProvider}
+          onClose={() => setInspectingProvider(null)}
+          title={inspectingProvider?.name || 'Account Details'}
+        >
+          {inspectingProvider && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {actionSuccessMsg && (
+                <div style={{ backgroundColor: '#DCFCE7', color: '#15803D', padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle2 size={14} /> {actionSuccessMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+                    {inspectingProvider.account_role === 'provider' ? 'Provider Partner' : 'Tenant Candidate'}
+                  </span>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    {inspectingProvider.name}
+                  </h2>
+                </div>
+
+                {!isSelf(inspectingProvider) && (
+                  <button
+                    onClick={() => setDeletingUser(inspectingProvider)}
+                    className="btn btn-outline-danger btn-sm"
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 12, padding: '6px 10px', color: '#DC2626' }}
+                  >
+                    <Trash2 size={13} /> Delete Account
+                  </button>
+                )}
+              </div>
+
+              {/* Specs Breakdown */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>Email Address</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                    {inspectingProvider.email}
+                  </div>
+                </div>
+                <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>Phone Number</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                    {inspectingProvider.phone}
+                  </div>
+                </div>
+                <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>Location</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                    {inspectingProvider.office_address || inspectingProvider.country}
+                  </div>
+                </div>
+                <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 }}>Status</span>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                    <Badge variant={inspectingProvider.status === 'verified' ? 'approved' : inspectingProvider.status === 'pending' ? 'warning' : 'rejected'}>
+                      {inspectingProvider.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Provider Verification Controls */}
+              {inspectingProvider.account_role === 'provider' && (
+                <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                  <button
+                    onClick={() => handleUpdateStatus(inspectingProvider.id, 'verified')}
+                    disabled={isActionLoading}
+                    className="btn btn-primary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
+                  >
+                    <CheckCircle2 size={16} /> Verify Provider
+                  </button>
+                  <button
+                    onClick={() => handleUpdateStatus(inspectingProvider.id, 'rejected')}
+                    disabled={isActionLoading}
+                    className="btn btn-outline-danger"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700 }}
+                  >
+                    <X size={16} /> Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </BottomSheet>
+      </div>
     </AppLayout>
   );
 }

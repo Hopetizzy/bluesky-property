@@ -228,6 +228,9 @@ export interface ApplicationDocument {
 export interface RentalApplication {
   id: string;
   application_ref: string;
+  is_direct?: boolean;
+  source?: 'direct' | 'listing';
+  link_id?: string;
   applicant_id: string;
   applicant_name: string;
   applicant_email: string;

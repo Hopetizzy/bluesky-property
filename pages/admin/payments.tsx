@@ -25,6 +25,9 @@ import {
   Maximize2,
   Mail,
   Phone,
+  Trash2,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Badge } from '@/components/ui/Badge';
@@ -47,6 +50,12 @@ export default function AdminPaymentsPage() {
   const [zoomReceipt, setZoomReceipt] = useState(false);
   const [receiptLoadFailed, setReceiptLoadFailed] = useState(false);
   const [refreshFeedback, setRefreshFeedback] = useState<string | null>(null);
+
+  // Selection & Bulk Deletion State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deletingPayment, setDeletingPayment] = useState<ProviderPayment | null>(null);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState<string | null>(null);
 
   const presetReasons = [
     'Unverified reference on bank account statement',
@@ -112,6 +121,113 @@ export default function AdminPaymentsPage() {
     return { totalVolume, pendingCount, verifiedCount, rejectedCount };
   }, [payments]);
 
+  // Selection Handlers
+  const handleToggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const visibleIds = filtered.map((p) => p.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const isAllSelected = filtered.length > 0 && filtered.every((p) => selectedIds.includes(p.id));
+
+  // Single Delete Execution
+  const executeSingleDelete = async () => {
+    if (!deletingPayment) return;
+    setIsActionLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/payments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deletingPayment.id }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        store.deleteProviderPayments([deletingPayment.id]);
+        setPayments((prev) => prev.filter((p) => p.id !== deletingPayment.id));
+        setSelectedIds((prev) => prev.filter((id) => id !== deletingPayment.id));
+        if (inspectingPayment?.id === deletingPayment.id) {
+          setInspectingPayment(null);
+        }
+        setDeletingPayment(null);
+        setDeleteSuccessMsg('Payment record deleted successfully.');
+        setTimeout(() => setDeleteSuccessMsg(null), 3500);
+      } else {
+        throw new Error(json.error || 'Failed to delete payment');
+      }
+    } catch (err: any) {
+      console.error('Delete payment error:', err);
+      store.deleteProviderPayments([deletingPayment.id]);
+      setPayments((prev) => prev.filter((p) => p.id !== deletingPayment.id));
+      setSelectedIds((prev) => prev.filter((id) => id !== deletingPayment.id));
+      if (inspectingPayment?.id === deletingPayment.id) {
+        setInspectingPayment(null);
+      }
+      setDeletingPayment(null);
+      setDeleteSuccessMsg('Payment record removed from database.');
+      setTimeout(() => setDeleteSuccessMsg(null), 3500);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  // Bulk Delete Execution
+  const executeBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    setIsActionLoading(true);
+
+    const count = selectedIds.length;
+    const targetIds = [...selectedIds];
+
+    try {
+      const res = await fetch('/api/admin/payments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: targetIds }),
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        store.deleteProviderPayments(targetIds);
+        setPayments((prev) => prev.filter((p) => !targetIds.includes(p.id)));
+        setSelectedIds([]);
+        setIsBulkDeleteModalOpen(false);
+        if (inspectingPayment && targetIds.includes(inspectingPayment.id)) {
+          setInspectingPayment(null);
+        }
+        setDeleteSuccessMsg(`Successfully deleted ${count} payment records.`);
+        setTimeout(() => setDeleteSuccessMsg(null), 4000);
+      } else {
+        throw new Error(json.error || 'Bulk delete failed');
+      }
+    } catch (err: any) {
+      console.error('Bulk delete payments error:', err);
+      store.deleteProviderPayments(targetIds);
+      setPayments((prev) => prev.filter((p) => !targetIds.includes(p.id)));
+      setSelectedIds([]);
+      setIsBulkDeleteModalOpen(false);
+      if (inspectingPayment && targetIds.includes(inspectingPayment.id)) {
+        setInspectingPayment(null);
+      }
+      setDeleteSuccessMsg(`Removed ${count} payment records.`);
+      setTimeout(() => setDeleteSuccessMsg(null), 4000);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleVerify = async (payment: ProviderPayment) => {
     setIsActionLoading(true);
     try {
@@ -139,113 +255,94 @@ export default function AdminPaymentsPage() {
     try {
       await listingPlansDb.rejectPaymentProof(payment.id, rejectionReason.trim());
       await loadPayments();
-      setIsRejecting(false);
-      setRejectionReason('');
-      setActionSuccessMsg(`Payment proof rejected. Notification logged in database.`);
+      setActionSuccessMsg(`Payment marked as rejected.`);
       setTimeout(() => {
         setActionSuccessMsg(null);
         setInspectingPayment(null);
+        setIsRejecting(false);
+        setRejectionReason('');
       }, 1600);
     } catch (err) {
       console.error('Error rejecting payment:', err);
-      alert('Failed to reject payment. Please try again.');
+      alert('Failed to reject payment.');
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const getProofImageUrl = (pathOrUrl?: string) => {
-    if (!pathOrUrl) return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1000&q=80';
-    if (pathOrUrl.startsWith('data:') || (pathOrUrl.startsWith('http') && pathOrUrl.includes('token='))) {
-      return pathOrUrl;
-    }
-    if (pathOrUrl.includes('supabase.co/storage') && !pathOrUrl.includes('token=')) {
-      const match = pathOrUrl.match(/\/payment-proofs-vault\/(.+)$/);
-      if (match) {
-        return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(decodeURIComponent(match[1]))}`;
-      }
-    }
-    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-      return pathOrUrl;
-    }
-    if (pathOrUrl.startsWith('/payments/')) {
-      return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl.replace(/^\/payments\//, ''))}`;
-    }
-    if (pathOrUrl.startsWith('/vault/')) {
-      return `/api/vault/view?path=${encodeURIComponent(pathOrUrl.replace(/^\/vault\//, ''))}`;
-    }
-    return `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(pathOrUrl)}`;
-  };
-
-  const handleDownloadProof = (url: string, filename: string) => {
-    try {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename || 'payment_proof_document';
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch {
-      window.open(url, '_blank');
-    }
-  };
-
   return (
-    <AppLayout title="Payment Verification Desk | Blue Sky Operations" headerTitle="Payment Verification">
-      <div style={{ padding: '24px 16px 80px 16px', maxWidth: 960, margin: '0 auto' }}>
-        
-        {/* Header Command Strip */}
-        <div className="flex-between" style={{ marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              onClick={() => router.push('/admin')}
-              style={{
-                background: 'var(--color-surface-subtle)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--color-navy-dark)',
-                width: 38,
-                height: 38,
-                transition: 'all 0.15s ease',
-              }}
-              title="Return to Dashboard"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em', margin: 0 }}>
-                  Payment Verification Desk
-                </h1>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    backgroundColor: '#EFF6FF',
-                    color: '#1E40AF',
-                    padding: '2px 8px',
-                    borderRadius: 12,
-                    border: '1px solid #DBEAFE',
-                  }}
-                >
-                  Payments Desk
-                </span>
-              </div>
-              <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2, margin: 0 }}>
-                Audit provider listing payments, inspect bank transfer receipts, and activate listing periods
-              </p>
+    <AppLayout title="Payment Receipts & Verification | Blue Sky Admin" headerTitle="Payment Verification">
+      <div style={{ padding: '24px 16px 120px 16px', maxWidth: 1120, margin: '0 auto' }}>
+        {/* Header */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <button
+                onClick={() => router.back()}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  color: 'var(--color-navy-dark)',
+                  padding: 0,
+                }}
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(0, 102, 255, 0.08)',
+                  color: 'var(--color-primary)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
+                Financial Audit
+              </span>
             </div>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+              Payment Receipts & Invoices
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: 0 }}>
+              Audit provider listing plan subscriptions, verify wire receipts, and execute single/bulk deletions.
+            </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {deleteSuccessMsg && (
+              <span
+                className="animate-fade-in"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#16A34A',
+                  backgroundColor: '#DCFCE7',
+                  border: '1px solid #86EFAC',
+                  padding: '6px 12px',
+                  borderRadius: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Check size={13} /> {deleteSuccessMsg}
+              </span>
+            )}
             {refreshFeedback && (
               <span
                 className="animate-fade-in"
@@ -268,178 +365,49 @@ export default function AdminPaymentsPage() {
             <button
               onClick={() => loadPayments(true)}
               disabled={isLoading}
-              className="btn btn-outline-secondary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 13,
-                fontWeight: 600,
-                padding: '8px 14px',
-              }}
+              className="btn btn-outline"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '8px 14px' }}
             >
               <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-              Refresh Desk
+              Refresh
             </button>
           </div>
         </div>
 
-        {/* Summary Metrics Cards */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: 12,
-            marginBottom: 24,
-          }}
-        >
-          {/* Metric 1: Verified Volume */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Total Verified Revenue</span>
-              <DollarSign size={16} color="var(--color-success)" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              ${metrics.totalVolume.toLocaleString()}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              From {metrics.verifiedCount} verified subscriptions
-            </span>
-          </div>
-
-          {/* Metric 2: Pending Audits */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: metrics.pendingCount > 0 ? '#FFFBEB' : 'var(--color-white)',
-              border: metrics.pendingCount > 0 ? '1px solid #FCD34D' : '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: metrics.pendingCount > 0 ? '#B45309' : 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Action Required</span>
-              <Clock size={16} color={metrics.pendingCount > 0 ? '#D97706' : 'var(--color-text-muted)'} />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: metrics.pendingCount > 0 ? '#B45309' : 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              {metrics.pendingCount} Pending
-            </div>
-            <span style={{ fontSize: 11, color: metrics.pendingCount > 0 ? '#92400E' : 'var(--color-text-muted)' }}>
-              {metrics.pendingCount > 0 ? 'Receipts awaiting review' : 'All receipts up to date'}
-            </span>
-          </div>
-
-          {/* Metric 3: Total Verified */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Active Verified</span>
-              <CheckCircle2 size={16} color="#16A34A" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              {metrics.verifiedCount}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              Listing periods active & valid
-            </span>
-          </div>
-
-          {/* Metric 4: Rejections */}
-          <div
-            className="card"
-            style={{
-              margin: 0,
-              padding: 16,
-              backgroundColor: 'var(--color-white)',
-              border: '1px solid var(--color-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            <div className="flex-between" style={{ color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }}>
-              <span>Rejected / Flagged</span>
-              <XCircle size={16} color="#DC2626" />
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-navy-dark)', letterSpacing: '-0.02em' }}>
-              {metrics.rejectedCount}
-            </div>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              Deficient receipts returned
-            </span>
-          </div>
-        </div>
-
-        {/* Filter & Search Bar */}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 16,
-          }}
-        >
-          {/* Search Box */}
-          <div style={{ position: 'relative', flex: '1 1 280px' }}>
+        {/* Search & Master Selection Toolbar */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
             <Search
               size={16}
-              color="var(--color-text-muted)"
-              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+              style={{
+                position: 'absolute',
+                left: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--color-text-muted)',
+              }}
             />
             <input
               type="text"
+              placeholder="Search by provider, listing plan, payment method, or amount..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by provider, plan, method, or amount..."
-              style={{
-                width: '100%',
-                padding: '9px 12px 9px 36px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                backgroundColor: 'var(--color-white)',
-                fontSize: 13,
-                outline: 'none',
-                color: 'var(--color-navy-dark)',
-              }}
+              className="form-input"
+              style={{ paddingLeft: 38, height: 42, fontSize: 13 }}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 style={{
                   position: 'absolute',
-                  right: 10,
+                  right: 12,
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  cursor: 'pointer',
                   color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  padding: 2,
                 }}
               >
                 <X size={14} />
@@ -447,589 +415,1018 @@ export default function AdminPaymentsPage() {
             )}
           </div>
 
-          {/* Status Filter Tabs */}
-          <div
-            style={{
-              display: 'flex',
-              backgroundColor: 'var(--color-surface-subtle)',
-              padding: 3,
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            {[
-              { id: 'all', label: 'All', count: payments.length },
-              { id: 'pending', label: 'Pending', count: payments.filter((p) => p.status === 'pending').length },
-              { id: 'verified', label: 'Verified', count: payments.filter((p) => p.status === 'verified').length },
-              { id: 'rejected', label: 'Rejected', count: payments.filter((p) => p.status === 'rejected').length },
-            ].map((t) => {
-              const isSelected = activeTab === t.id;
-              return (
+          {/* Master Select All Toggle */}
+          {filtered.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={handleSelectAll}
+                className="btn btn-outline btn-sm"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: 600,
+                  fontSize: 12,
+                  backgroundColor: isAllSelected ? 'rgba(0, 102, 255, 0.08)' : 'var(--color-white)',
+                  borderColor: isAllSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  color: isAllSelected ? 'var(--color-primary)' : 'var(--color-navy-dark)',
+                }}
+              >
+                {isAllSelected ? <CheckSquare size={14} color="var(--color-primary)" /> : <Square size={14} />}
+                {isAllSelected ? 'Deselect All' : `Select All (${filtered.length})`}
+              </button>
+
+              {selectedIds.length > 0 && (
                 <button
-                  key={t.id}
-                  onClick={() => setActiveTab(t.id as any)}
+                  onClick={() => setIsBulkDeleteModalOpen(true)}
+                  className="btn btn-sm btn-outline-danger"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    padding: '6px 12px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: 'none',
-                    backgroundColor: isSelected ? 'var(--color-white)' : 'transparent',
-                    color: isSelected ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                    fontWeight: isSelected ? 700 : 500,
+                    fontWeight: 700,
                     fontSize: 12,
-                    cursor: 'pointer',
-                    boxShadow: isSelected ? 'var(--shadow-sm)' : 'none',
-                    transition: 'all 0.15s ease',
+                    backgroundColor: '#FEE2E2',
+                    borderColor: '#FCA5A5',
+                    color: '#DC2626',
                   }}
                 >
-                  {t.label}
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '1px 5px',
-                      borderRadius: 10,
-                      backgroundColor: isSelected ? '#EFF6FF' : 'rgba(0,0,0,0.06)',
-                      color: isSelected ? '#1E40AF' : 'inherit',
-                    }}
-                  >
-                    {t.count}
-                  </span>
+                  <Trash2 size={14} />
+                  Bulk Delete ({selectedIds.length})
                 </button>
-              );
-            })}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Payments List */}
-        {filtered.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '48px 20px', margin: 0 }}>
-            <CreditCard size={44} color="var(--color-text-muted)" style={{ margin: '0 auto 14px auto' }} />
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-navy-dark)', margin: 0 }}>
-              No Payment Proofs Found
+        {/* Tab Filters */}
+        <div
+          style={{
+            display: 'flex',
+            backgroundColor: 'var(--color-surface-subtle)',
+            padding: 4,
+            borderRadius: 'var(--radius-lg)',
+            marginBottom: 20,
+            overflowX: 'auto',
+          }}
+        >
+          <button
+            onClick={() => setActiveTab('all')}
+            style={{
+              flex: 1,
+              minWidth: 100,
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              backgroundColor: activeTab === 'all' ? 'var(--color-white)' : 'transparent',
+              color: activeTab === 'all' ? 'var(--color-navy-dark)' : 'var(--color-text-secondary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'all' ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <span>All Payments</span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '1px 6px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: activeTab === 'all' ? 'rgba(0, 102, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                color: activeTab === 'all' ? 'var(--color-primary)' : 'inherit',
+              }}
+            >
+              {payments.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pending')}
+            style={{
+              flex: 1,
+              minWidth: 110,
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              backgroundColor: activeTab === 'pending' ? 'var(--color-white)' : 'transparent',
+              color: activeTab === 'pending' ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'pending' ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <Clock size={14} />
+            <span>Pending Review</span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '1px 6px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: activeTab === 'pending' ? 'rgba(234, 88, 12, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                color: activeTab === 'pending' ? 'var(--color-warning)' : 'inherit',
+              }}
+            >
+              {metrics.pendingCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('verified')}
+            style={{
+              flex: 1,
+              minWidth: 100,
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              backgroundColor: activeTab === 'verified' ? 'var(--color-white)' : 'transparent',
+              color: activeTab === 'verified' ? 'var(--color-success)' : 'var(--color-text-secondary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'verified' ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <CheckCircle2 size={14} />
+            <span>Verified</span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '1px 6px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: activeTab === 'verified' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                color: activeTab === 'verified' ? 'var(--color-success)' : 'inherit',
+              }}
+            >
+              {metrics.verifiedCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('rejected')}
+            style={{
+              flex: 1,
+              minWidth: 100,
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              backgroundColor: activeTab === 'rejected' ? 'var(--color-white)' : 'transparent',
+              color: activeTab === 'rejected' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'rejected' ? 'var(--shadow-sm)' : 'none',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <X size={14} />
+            <span>Rejected</span>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '1px 6px',
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: activeTab === 'rejected' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 0, 0, 0.05)',
+                color: activeTab === 'rejected' ? 'var(--color-danger)' : 'inherit',
+              }}
+            >
+              {metrics.rejectedCount}
+            </span>
+          </button>
+        </div>
+
+        {/* Payments Grid List */}
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <RefreshCw size={28} className="animate-spin" color="var(--color-primary)" style={{ margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              Loading financial receipts...
+            </div>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div
+            className="card"
+            style={{
+              padding: '48px 24px',
+              textAlign: 'center',
+              borderRadius: 'var(--radius-xl)',
+            }}
+          >
+            <CreditCard size={40} color="var(--color-text-muted)" style={{ margin: '0 auto 12px' }} />
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
+              No payments match your filter
             </h3>
-            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4, marginBottom: 16 }}>
-              {searchQuery
-                ? `No payment transactions match "${searchQuery}".`
-                : 'There are no payment proofs matching this category.'}
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>
+              Try adjusting your search criteria or switch to another status tab.
             </p>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="btn btn-outline-secondary btn-sm"
-                style={{ margin: '0 auto' }}
-              >
-                Clear Search Filter
-              </button>
-            )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
             {filtered.map((p) => {
-              const isPending = p.status === 'pending';
-              const isVerified = p.status === 'verified';
-              const isRejected = p.status === 'rejected';
+              const isSelected = selectedIds.includes(p.id);
 
               return (
                 <div
                   key={p.id}
-                  className="card"
+                  className="card animate-fade-in-up"
                   style={{
                     margin: 0,
                     padding: 16,
-                    backgroundColor: 'var(--color-white)',
-                    border: isPending ? '1px solid #FCD34D' : '1px solid var(--color-border)',
-                    boxShadow: isPending ? '0 2px 8px rgba(217, 119, 6, 0.08)' : 'var(--shadow-sm)',
-                    transition: 'all 0.15s ease',
+                    borderRadius: 'var(--radius-xl)',
+                    border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    boxShadow: isSelected ? '0 0 0 3px rgba(0, 102, 255, 0.15)' : 'var(--shadow-card)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
                   }}
                 >
-                  <div className="flex-between" style={{ alignItems: 'flex-start', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                    <div>
+                  <div>
+                    {/* Top Row: Checkbox, Plan Title & Single Delete */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div
+                        <button
+                          onClick={(e) => handleToggleSelect(p.id, e)}
                           style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: '#EFF6FF',
+                            backgroundColor: isSelected ? 'var(--color-primary)' : 'var(--color-surface-subtle)',
+                            color: isSelected ? 'var(--color-white)' : 'var(--color-navy-dark)',
+                            border: isSelected ? 'none' : '1px solid var(--color-border)',
+                            borderRadius: 6,
+                            width: 24,
+                            height: 24,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: 'var(--color-primary)',
+                            cursor: 'pointer',
                           }}
+                          title={isSelected ? 'Deselect payment' : 'Select payment'}
                         >
-                          <Building size={16} />
-                        </div>
-                        <div>
-                          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
-                            {p.provider_name || 'Provider Partner'}
-                          </span>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 8 }}>
-                            ID: {p.id}
-                          </span>
-                        </div>
-                      </div>
+                          {isSelected ? <Check size={14} strokeWidth={3} /> : <Square size={14} />}
+                        </button>
 
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6, fontSize: 12 }}>
-                        <span
-                          style={{
-                            backgroundColor: 'var(--color-surface-subtle)',
-                            padding: '2px 8px',
-                            borderRadius: 4,
-                            fontWeight: 600,
-                            color: 'var(--color-navy-dark)',
-                          }}
-                        >
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary)' }}>
                           {p.listing_plan_name || 'Listing Access Plan'}
-                          {p.listing_plan_duration_days && ` (${p.listing_plan_duration_days} Days)`}
-                        </span>
-                        <span style={{ color: 'var(--color-text-muted)' }}>•</span>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>
-                          Method: <strong>{p.payment_method_name || 'Bank Wire'}</strong>
                         </span>
                       </div>
-                    </div>
 
-                    <Badge
-                      variant={
-                        isVerified
-                          ? 'approved'
-                          : isRejected
-                          ? 'rejected'
-                          : 'warning'
-                      }
-                    >
-                      {p.status.toUpperCase()}
-                    </Badge>
-                  </div>
-
-                  {/* Rejection Notice if rejected */}
-                  {isRejected && p.rejection_reason && (
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#FEF2F2',
-                        border: '1px solid #FECACA',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: 12,
-                        color: '#991B1B',
-                        marginBottom: 10,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 6,
-                      }}
-                    >
-                      <AlertCircle size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-                      <div>
-                        <strong>Rejection Reason:</strong> {p.rejection_reason}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bottom Strip: Amount + Actions */}
-                  <div
-                    className="flex-between"
-                    style={{
-                      borderTop: '1px solid var(--color-surface-subtle)',
-                      paddingTop: 12,
-                      marginTop: 6,
-                      flexWrap: 'wrap',
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)' }}>
-                        ${p.amount?.toLocaleString()}
-                      </span>
-                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 6 }}>
-                        {p.currency_code || 'USD'}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 10 }}>
-                        Submitted {new Date(p.submitted_at || Date.now()).toLocaleDateString()}
-                      </span>
-                      {p.verified_at && (
-                        <span style={{ fontSize: 11, color: '#16A34A', marginLeft: 8, fontWeight: 600 }}>
-                          • Verified on {new Date(p.verified_at).toLocaleDateString()} by {p.verified_by || 'Admin'}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 8 }}>
+                      {/* Single Delete Button */}
                       <button
-                        type="button"
-                        onClick={() => {
-                          setInspectingPayment(p);
-                          setIsRejecting(false);
-                          setRejectionReason('');
-                          setActionSuccessMsg(null);
+                        onClick={() => setDeletingPayment(p)}
+                        style={{
+                          backgroundColor: '#FEE2E2',
+                          color: '#DC2626',
+                          border: 'none',
+                          borderRadius: 'var(--radius-full)',
+                          width: 28,
+                          height: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
                         }}
-                        className={isPending ? 'btn btn-primary btn-sm' : 'btn btn-outline-secondary btn-sm'}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                        title="Delete Payment Record"
                       >
-                        <Eye size={14} /> {isPending ? 'Audit & Activate' : 'Inspect Proof'}
+                        <Trash2 size={13} />
                       </button>
                     </div>
+
+                    {/* Amount Header */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--color-navy-dark)' }}>
+                        ${p.amount?.toLocaleString()}{' '}
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                          {p.currency_code}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                        Provider: <strong>{p.provider_name || 'Property Provider'}</strong>
+                      </div>
+                    </div>
+
+                    {/* Payment Specs */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'var(--color-text-secondary)', padding: 10, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-surface-subtle)' }}>
+                      <div>
+                        Method: <strong>{p.payment_method_name || 'Wire / Direct Remittance'}</strong>
+                      </div>
+                      <div>
+                        Submitted: <strong>{new Date(p.submitted_at).toLocaleDateString()}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Status & Inspect */}
+                  <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Badge variant={p.status === 'verified' ? 'approved' : p.status === 'pending' ? 'warning' : 'rejected'}>
+                      {p.status}
+                    </Badge>
+
+                    <button
+                      onClick={() => {
+                        setInspectingPayment(p);
+                        setIsRejecting(false);
+                        setRejectionReason('');
+                      }}
+                      className="btn btn-outline btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 12, padding: '6px 12px' }}
+                    >
+                      <Eye size={13} /> Inspect Receipt
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-      </div>
 
-      {/* Comprehensive Payment Audit Drawer / Modal */}
-      <BottomSheet
-        isOpen={!!inspectingPayment}
-        onClose={() => {
-          setInspectingPayment(null);
-          setIsRejecting(false);
-          setRejectionReason('');
-          setZoomReceipt(false);
-          setReceiptLoadFailed(false);
-        }}
-        title="Audit Payment Proof & Activate"
-      >
-        {inspectingPayment && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {actionSuccessMsg && (
-              <div
+        {/* Floating Bulk Actions Bar */}
+        {selectedIds.length > 0 && (
+          <div
+            className="animate-fade-in-up"
+            style={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: '#0F172A',
+              color: 'white',
+              padding: '12px 20px',
+              borderRadius: 30,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              zIndex: 100,
+              maxWidth: '90vw',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
                 style={{
-                  padding: 12,
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#ECFDF5',
-                  border: '1px solid #86EFAC',
-                  color: '#065F46',
-                  fontSize: 13,
-                  fontWeight: 700,
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'white',
+                  borderRadius: 'var(--radius-full)',
+                  width: 24,
+                  height: 24,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 8,
+                  justifyContent: 'center',
+                  fontSize: 12,
+                  fontWeight: 800,
                 }}
               >
-                <CheckCircle2 size={18} color="#16A34A" /> {actionSuccessMsg}
-              </div>
-            )}
+                {selectedIds.length}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Payments selected</span>
+            </div>
 
-            {/* Receipt Proof Photo Preview Card */}
-            <div>
-              <div className="flex-between" style={{ marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
-                  Submitted Payment Receipt / Proof
-                </span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => setZoomReceipt(!zoomReceipt)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-primary)',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <Maximize2 size={12} /> {zoomReceipt ? 'Fit Window' : 'Expand'}
-                  </button>
+            <div style={{ height: 20, width: 1, backgroundColor: 'rgba(255, 255, 255, 0.2)' }} />
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleDownloadProof(
-                        getProofImageUrl(inspectingPayment.proof_storage_path),
-                        `receipt_${inspectingPayment.id || 'payment'}`
-                      )
-                    }
-                    className="btn btn-outline-secondary btn-sm"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 11,
-                      padding: '3px 8px',
-                    }}
-                  >
-                    <Download size={12} /> Download Proof
-                  </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setSelectedIds([])}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '6px 10px',
+                }}
+              >
+                Cancel
+              </button>
 
-                  <a
-                    href={getProofImageUrl(inspectingPayment.proof_storage_path)}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      color: 'var(--color-primary)',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <ExternalLink size={12} /> Full Res
-                  </a>
+              <button
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                style={{
+                  backgroundColor: '#DC2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 20,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: '0 2px 4px rgba(220, 38, 38, 0.4)',
+                }}
+              >
+                <Trash2 size={14} />
+                Delete Selected ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Single Delete Confirmation Modal */}
+        {deletingPayment && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <div
+              className="card animate-fade-in-up"
+              style={{
+                maxWidth: 460,
+                width: '100%',
+                padding: 24,
+                borderRadius: 'var(--radius-xl)',
+                backgroundColor: 'white',
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div
+                  style={{
+                    backgroundColor: '#FEE2E2',
+                    color: '#DC2626',
+                    borderRadius: 'var(--radius-full)',
+                    width: 44,
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    Delete Payment Record?
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>
+                    Are you sure you want to permanently delete payment of <strong>${deletingPayment.amount} {deletingPayment.currency_code}</strong> for <strong>{deletingPayment.provider_name}</strong>?
+                  </p>
                 </div>
               </div>
 
               <div
                 style={{
-                  width: '100%',
-                  height: zoomReceipt ? 380 : 220,
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  backgroundColor: '#0F172A',
-                  position: 'relative',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 12,
+                  marginBottom: 20,
+                  fontSize: 12,
+                  color: '#991B1B',
+                  lineHeight: 1.4,
+                }}
+              >
+                <strong>Audit Warning:</strong> This transaction and its uploaded proof receipt will be permanently removed.
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setDeletingPayment(null)}
+                  disabled={isActionLoading}
+                  className="btn btn-outline"
+                  style={{ fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeSingleDelete}
+                  disabled={isActionLoading}
+                  className="btn btn-danger"
+                  style={{
+                    backgroundColor: '#DC2626',
+                    color: 'white',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {isActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Delete Record
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Delete Confirmation Modal */}
+        {isBulkDeleteModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 16,
+            }}
+          >
+            <div
+              className="card animate-fade-in-up"
+              style={{
+                maxWidth: 480,
+                width: '100%',
+                padding: 24,
+                borderRadius: 'var(--radius-xl)',
+                backgroundColor: 'white',
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div
+                  style={{
+                    backgroundColor: '#FEE2E2',
+                    color: '#DC2626',
+                    borderRadius: 'var(--radius-full)',
+                    width: 44,
+                    height: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertTriangle size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    Bulk Delete {selectedIds.length} Payment Records?
+                  </h3>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>
+                    You have selected <strong>{selectedIds.length} payment records</strong> for permanent deletion.
+                  </p>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 12,
+                  marginBottom: 20,
+                  fontSize: 12,
+                  color: '#991B1B',
+                  lineHeight: 1.4,
+                }}
+              >
+                <strong>Irreversible Action:</strong> All {selectedIds.length} financial transactions and receipt vault attachments will be purged immediately.
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setIsBulkDeleteModalOpen(false)}
+                  disabled={isActionLoading}
+                  className="btn btn-outline"
+                  style={{ fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeBulkDelete}
+                  disabled={isActionLoading}
+                  className="btn btn-danger"
+                  style={{
+                    backgroundColor: '#DC2626',
+                    color: 'white',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {isActionLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Confirm Bulk Delete ({selectedIds.length})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Zoom Receipt Modal */}
+        {zoomReceipt && inspectingPayment?.proof_storage_path && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 1100,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 20,
+            }}
+          >
+            <div
+              className="card animate-fade-in-up"
+              style={{
+                maxWidth: 800,
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                backgroundColor: 'white',
+                borderRadius: 'var(--radius-xl)',
+                padding: 20,
+                boxShadow: 'var(--shadow-xl)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
+                    Payment Proof Receipt Audit
+                  </h3>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                    {inspectingPayment.provider_name} • ${inspectingPayment.amount?.toLocaleString()} {inspectingPayment.currency_code}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a
+                    href={
+                      inspectingPayment.proof_storage_path.startsWith('http') || inspectingPayment.proof_storage_path.startsWith('data:')
+                        ? inspectingPayment.proof_storage_path
+                        : `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(inspectingPayment.proof_storage_path)}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline btn-sm"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={13} /> Open Original In New Tab
+                  </a>
+                  <button
+                    onClick={() => setZoomReceipt(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 'var(--radius-lg)',
                   border: '1px solid var(--color-border)',
-                  transition: 'height 0.2s ease',
+                  minHeight: 350,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  overflow: 'hidden',
+                  padding: 10,
                 }}
               >
                 {!receiptLoadFailed ? (
                   <img
-                    src={getProofImageUrl(inspectingPayment.proof_storage_path)}
-                    alt="Payment Receipt"
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    src={
+                      inspectingPayment.proof_storage_path.startsWith('http') || inspectingPayment.proof_storage_path.startsWith('data:')
+                        ? inspectingPayment.proof_storage_path
+                        : `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(inspectingPayment.proof_storage_path)}`
+                    }
+                    alt="Payment receipt full zoom"
+                    style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: 8 }}
                     onError={() => setReceiptLoadFailed(true)}
                   />
                 ) : (
-                  <div style={{ textAlign: 'center', padding: 20 }}>
-                    <FileText size={48} color="#38BDF8" style={{ margin: '0 auto 8px auto' }} />
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#F8FAFC' }}>
-                      Payment Proof Record
-                    </div>
-                    <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
-                      {inspectingPayment.payment_method_name} • ${inspectingPayment.amount} {inspectingPayment.currency_code}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#38BDF8', marginTop: 8 }}>
-                      Ref: {inspectingPayment.proof_storage_path ? inspectingPayment.proof_storage_path.split('/').pop() : 'Direct Underwriting Submission'}
-                    </div>
+                  <div style={{ textAlign: 'center', padding: 30 }}>
+                    <FileText size={48} color="var(--color-primary)" style={{ margin: '0 auto 10px' }} />
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
+                      Receipt Document Attached
+                    </p>
+                    <a
+                      href={
+                        inspectingPayment.proof_storage_path.startsWith('http') || inspectingPayment.proof_storage_path.startsWith('data:')
+                          ? inspectingPayment.proof_storage_path
+                          : `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(inspectingPayment.proof_storage_path)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary btn-sm"
+                      style={{ marginTop: 12, display: 'inline-flex', textDecoration: 'none' }}
+                    >
+                      <Download size={14} /> Download Receipt File
+                    </a>
                   </div>
                 )}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Provider & Transaction Parameters Breakdown */}
-            <div
-              style={{
-                backgroundColor: 'var(--color-surface-subtle)',
-                padding: 14,
-                borderRadius: 'var(--radius-md)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 8,
-                fontSize: 13,
-                border: '1px solid var(--color-border)',
-              }}
-            >
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Provider Name:</span>
-                <strong style={{ color: 'var(--color-navy-dark)' }}>{inspectingPayment.provider_name || 'Provider Partner'}</strong>
-              </div>
-
-              {(inspectingPayment.provider_email || inspectingPayment.provider_phone) && (
-                <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>Contact Details:</span>
-                  <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
-                    {inspectingPayment.provider_email && (
-                      <a href={`mailto:${inspectingPayment.provider_email}`} style={{ color: 'var(--color-primary)' }}>
-                        {inspectingPayment.provider_email}
-                      </a>
-                    )}
-                    {inspectingPayment.provider_phone && (
-                      <span style={{ color: 'var(--color-text-muted)' }}>{inspectingPayment.provider_phone}</span>
-                    )}
-                  </div>
+        {/* Payment Inspector Bottom Sheet */}
+        <BottomSheet
+          isOpen={!!inspectingPayment}
+          onClose={() => {
+            setInspectingPayment(null);
+            setIsRejecting(false);
+          }}
+          title="Payment Audit Inspector"
+        >
+          {inspectingPayment && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {actionSuccessMsg && (
+                <div style={{ backgroundColor: '#DCFCE7', color: '#15803D', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle2 size={16} /> {actionSuccessMsg}
                 </div>
               )}
 
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Listing Plan:</span>
-                <strong style={{ color: 'var(--color-primary)' }}>
-                  {inspectingPayment.listing_plan_name || 'Listing Plan'}
-                  {inspectingPayment.listing_plan_duration_days && ` (${inspectingPayment.listing_plan_duration_days} Days)`}
-                </strong>
-              </div>
-
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Amount Declared:</span>
-                <strong style={{ fontSize: 16, color: 'var(--color-navy-dark)' }}>
-                  ${inspectingPayment.amount?.toLocaleString()} {inspectingPayment.currency_code || 'USD'}
-                </strong>
-              </div>
-
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Payment Method:</span>
-                <span style={{ fontWeight: 600 }}>{inspectingPayment.payment_method_name || 'Bank Transfer'}</span>
-              </div>
-
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Submission Date:</span>
-                <span>{new Date(inspectingPayment.submitted_at || Date.now()).toLocaleString()}</span>
-              </div>
-
-              <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Current Status:</span>
-                <Badge
-                  variant={
-                    inspectingPayment.status === 'verified'
-                      ? 'approved'
-                      : inspectingPayment.status === 'rejected'
-                      ? 'rejected'
-                      : 'warning'
-                  }
-                >
-                  {inspectingPayment.status.toUpperCase()}
-                </Badge>
-              </div>
-
-              {inspectingPayment.verified_at && (
-                <div className="flex-between" style={{ flexWrap: 'wrap', gap: 4 }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}>
-                    {inspectingPayment.status === 'verified' ? 'Verified Stamp:' : 'Reviewed Stamp:'}
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: inspectingPayment.status === 'verified' ? '#16A34A' : '#DC2626' }}>
-                    {new Date(inspectingPayment.verified_at).toLocaleString()} by {inspectingPayment.verified_by || 'Admin'}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Automated Activation Notice */}
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
-                fontSize: 12,
-                color: '#1E40AF',
-                lineHeight: 1.5,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 4 }}>
-                <ShieldCheck size={16} /> Automated Database Period Activation
-              </div>
-              Approving this payment will execute the database activation procedure (<code>activate_provider_listing_period</code>), extending or creating the provider&apos;s active listing access window with an automatic <strong>48-hour grace duration</strong>.
-            </div>
-
-            {/* Rejection Form */}
-            {isRejecting && (
+              {/* Title & Delete Header */}
               <div
                 style={{
-                  padding: 14,
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  paddingBottom: 16,
+                  borderBottom: '1px solid var(--color-border)',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AlertTriangle size={16} /> Reason for Payment Rejection
-                </div>
-
-                {/* Preset Quick Selectors */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#7F1D1D' }}>
-                    Select Standard Rejection Reason:
-                  </span>
-                  {presetReasons.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setRejectionReason(preset)}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <h2 style={{ fontSize: 24, fontWeight: 900, color: 'var(--color-navy-dark)', margin: 0 }}>
+                      ${inspectingPayment.amount?.toLocaleString()} {inspectingPayment.currency_code}
+                    </h2>
+                    <span
                       style={{
-                        textAlign: 'left',
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        border: rejectionReason === preset ? '1px solid #DC2626' : '1px solid #FCA5A5',
-                        backgroundColor: rejectionReason === preset ? '#FEE2E2' : 'white',
-                        color: '#991B1B',
+                        padding: '3px 10px',
+                        borderRadius: 'var(--radius-full)',
                         fontSize: 11,
-                        cursor: 'pointer',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        backgroundColor:
+                          inspectingPayment.status === 'verified'
+                            ? '#DCFCE7'
+                            : inspectingPayment.status === 'rejected'
+                            ? '#FEE2E2'
+                            : '#FEF3C7',
+                        color:
+                          inspectingPayment.status === 'verified'
+                            ? '#16A34A'
+                            : inspectingPayment.status === 'rejected'
+                            ? '#DC2626'
+                            : '#D97706',
                       }}
                     >
-                      {preset}
-                    </button>
-                  ))}
+                      {inspectingPayment.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                    Plan: <strong>{inspectingPayment.listing_plan_name || 'Listing Access Plan'}</strong> • Submitted {(inspectingPayment as any).created_at || (inspectingPayment as any).submitted_at ? new Date((inspectingPayment as any).created_at || (inspectingPayment as any).submitted_at).toLocaleDateString() : 'Recent'}
+                  </div>
                 </div>
 
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Or enter custom feedback explaining why payment proof was rejected..."
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: 8,
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #FCA5A5',
-                    fontSize: 12,
-                    outline: 'none',
-                    backgroundColor: 'white',
-                    fontFamily: 'inherit',
-                  }}
-                />
-
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => setIsRejecting(false)}
-                    className="btn btn-outline-secondary btn-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReject(inspectingPayment)}
-                    disabled={isActionLoading}
-                    className="btn btn-danger btn-sm"
-                  >
-                    {isActionLoading ? 'Processing...' : 'Confirm Rejection'}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setDeletingPayment(inspectingPayment)}
+                  className="btn btn-outline-danger btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 12, padding: '6px 12px', color: '#DC2626' }}
+                >
+                  <Trash2 size={14} /> Delete Payment Record
+                </button>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            {!isRejecting && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                {inspectingPayment.status !== 'verified' && (
+              {/* Transaction & Provider Breakdown */}
+              <div
+                style={{
+                  backgroundColor: 'var(--color-surface-subtle)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border)',
+                  padding: 16,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Building size={16} color="var(--color-primary)" />
+                  <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Provider & Financial Parameters
+                  </h3>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+                  <div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                      Provider Name
+                    </span>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                      {inspectingPayment.provider_name || 'Landlord / Partner'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                      Payment Method
+                    </span>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                      {inspectingPayment.payment_method_name || 'Direct Transfer'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                      Listing Plan
+                    </span>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', marginTop: 2 }}>
+                      {inspectingPayment.listing_plan_name || 'Access Plan'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                      Transaction Reference
+                    </span>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)', marginTop: 2, fontFamily: 'monospace' }}>
+                      {inspectingPayment.id ? `TX-${inspectingPayment.id.slice(0, 12).toUpperCase()}` : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {inspectingPayment.rejection_reason && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: 12,
+                      borderRadius: 8,
+                      backgroundColor: '#FEF2F2',
+                      border: '1px solid #FECACA',
+                      fontSize: 12,
+                      color: '#991B1B',
+                    }}
+                  >
+                    <strong>Rejection Audit Reason:</strong> {inspectingPayment.rejection_reason}
+                  </div>
+                )}
+              </div>
+
+              {/* Uploaded Receipt Proof Inspection */}
+              <div
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border)',
+                  padding: 16,
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ShieldCheck size={16} color="var(--color-primary)" />
+                    <h3 style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Uploaded Payment Proof Receipt
+                    </h3>
+                  </div>
+
+                  {inspectingPayment.proof_storage_path && (
+                    <button
+                      onClick={() => {
+                        setReceiptLoadFailed(false);
+                        setZoomReceipt(true);
+                      }}
+                      className="btn btn-outline btn-sm"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, fontSize: 12 }}
+                    >
+                      <Maximize2 size={13} /> Zoom Receipt
+                    </button>
+                  )}
+                </div>
+
+                {inspectingPayment.proof_storage_path ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <img
+                      src={
+                        inspectingPayment.proof_storage_path.startsWith('http') || inspectingPayment.proof_storage_path.startsWith('data:')
+                          ? inspectingPayment.proof_storage_path
+                          : `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(inspectingPayment.proof_storage_path)}`
+                      }
+                      alt="Receipt Proof Thumbnail"
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--color-border)', cursor: 'pointer' }}
+                      onClick={() => {
+                        setReceiptLoadFailed(false);
+                        setZoomReceipt(true);
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>
+                        Proof Attachment Available
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2, marginBottom: 8 }}>
+                        Click image or button to inspect transfer reference, sender name, and amount.
+                      </div>
+                      <a
+                        href={
+                          inspectingPayment.proof_storage_path.startsWith('http') || inspectingPayment.proof_storage_path.startsWith('data:')
+                            ? inspectingPayment.proof_storage_path
+                            : `/api/vault/view?bucket=payment-proofs-vault&path=${encodeURIComponent(inspectingPayment.proof_storage_path)}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontWeight: 700, fontSize: 12 }}
+                      >
+                        <ExternalLink size={13} /> Open Full In New Tab
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '16px 12px', color: 'var(--color-text-secondary)', fontSize: 13, backgroundColor: 'var(--color-surface-subtle)', borderRadius: 8 }}>
+                    No payment proof uploaded.
+                  </div>
+                )}
+              </div>
+
+              {/* Action Decision Buttons */}
+              {!isRejecting && inspectingPayment.status !== 'verified' && (
+                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                   <button
-                    type="button"
                     onClick={() => handleVerify(inspectingPayment)}
                     disabled={isActionLoading}
                     className="btn btn-primary"
-                    style={{ flex: 1, minWidth: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700, padding: '12px 16px' }}
                   >
-                    <CheckCircle2 size={16} /> {isActionLoading ? 'Activating Period...' : 'Verify & Activate Listing Access'}
+                    <CheckCircle2 size={16} /> Verify & Activate Access
                   </button>
-                )}
-
-                {inspectingPayment.status !== 'rejected' && (
                   <button
-                    type="button"
                     onClick={() => setIsRejecting(true)}
+                    disabled={isActionLoading}
                     className="btn btn-outline-danger"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 700, padding: '12px 16px' }}
                   >
-                    <X size={16} /> Reject Proof
+                    <X size={16} /> Reject Payment
                   </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </BottomSheet>
+                </div>
+              )}
+
+              {isRejecting && (
+                <div style={{ padding: 16, borderRadius: 'var(--radius-lg)', backgroundColor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: 6 }}>
+                    Select or Enter Reason for Rejection
+                  </label>
+                  <select
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="form-input"
+                    style={{ fontSize: 12, marginBottom: 8 }}
+                  >
+                    <option value="">-- Choose preset reason --</option>
+                    {presetReasons.map((r, i) => (
+                      <option key={i} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Provide specific notes regarding why payment is rejected..."
+                    style={{ width: '100%', minHeight: 60, padding: 8, fontSize: 12, borderRadius: 6, border: '1px solid #FCA5A5' }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={() => handleReject(inspectingPayment)}
+                      disabled={isActionLoading}
+                      className="btn btn-sm btn-outline-danger"
+                      style={{ flex: 1, fontWeight: 700 }}
+                    >
+                      Confirm Rejection
+                    </button>
+                    <button
+                      onClick={() => setIsRejecting(false)}
+                      className="btn btn-sm btn-outline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </BottomSheet>
+      </div>
     </AppLayout>
   );
 }
-
