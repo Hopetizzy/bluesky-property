@@ -220,9 +220,7 @@ export default function DirectApplyPage() {
     employer.trim() &&
     occupation.trim() &&
     monthlyIncome.trim() &&
-    currentAddress.trim() &&
-    incomeDoc &&
-    addressDoc
+    currentAddress.trim()
   );
   const isStep4Valid = Boolean(moveInDate && leaseMonths && occupants);
   const isStep5Valid = portalData?.fee_enabled ? Boolean(selectedMethodId && proofPaymentFile) : true;
@@ -909,15 +907,15 @@ export default function DirectApplyPage() {
             </div>
           )}
 
-          {/* STEP 3: SSN & Income & Address Proofs */}
+          {/* STEP 3: SSN & Income & Residential Information */}
           {currentStep === 3 && (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--color-navy-dark)', margin: 0 }}>
-                  Financial & Address Verification
+                  Financial & Residential Information
                 </h2>
                 <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 4 }}>
-                  Provide your SSN / National Tax ID, employer details, monthly income, and proof documents.
+                  Provide your SSN / National Tax ID, employer details, monthly income, and current residential address.
                 </p>
               </div>
 
@@ -1013,75 +1011,6 @@ export default function DirectApplyPage() {
                     className="form-input"
                     required
                   />
-                </div>
-              </div>
-
-              {/* Supporting Documents Uploads */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                {/* Proof of Income */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-navy-dark)', display: 'block', marginBottom: 4 }}>
-                    Proof of Income (Paystub / Tax Return) *
-                  </label>
-                  <input
-                    type="file"
-                    ref={incomeInputRef}
-                    onChange={(e) => handleGenericFileUpload(e, setIncomeDoc)}
-                    accept="image/*,application/pdf"
-                    style={{ display: 'none' }}
-                  />
-
-                  {incomeDoc ? (
-                    <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: '#F0FDF4', border: '1px solid #86EFAC', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {incomeDoc.name}
-                      </span>
-                      <button onClick={() => setIncomeDoc(null)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer' }}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => incomeInputRef.current?.click()}
-                      style={{ border: '2px dashed var(--color-border)', borderRadius: 'var(--radius-md)', padding: 16, textAlign: 'center', cursor: 'pointer' }}
-                    >
-                      <Upload size={20} color="var(--color-primary)" style={{ margin: '0 auto 4px' }} />
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-navy-dark)' }}>Upload Paystub/W2</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Proof of Address */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-navy-dark)', display: 'block', marginBottom: 4 }}>
-                    Proof of Address (Utility Bill / Lease) *
-                  </label>
-                  <input
-                    type="file"
-                    ref={addressInputRef}
-                    onChange={(e) => handleGenericFileUpload(e, setAddressDoc)}
-                    accept="image/*,application/pdf"
-                    style={{ display: 'none' }}
-                  />
-
-                  {addressDoc ? (
-                    <div style={{ padding: 12, borderRadius: 'var(--radius-md)', backgroundColor: '#F0FDF4', border: '1px solid #86EFAC', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#166534', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {addressDoc.name}
-                      </span>
-                      <button onClick={() => setAddressDoc(null)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer' }}>
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={() => addressInputRef.current?.click()}
-                      style={{ border: '2px dashed var(--color-border)', borderRadius: 'var(--radius-md)', padding: 16, textAlign: 'center', cursor: 'pointer' }}
-                    >
-                      <Upload size={20} color="var(--color-primary)" style={{ margin: '0 auto 4px' }} />
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-navy-dark)' }}>Upload Utility Bill</div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

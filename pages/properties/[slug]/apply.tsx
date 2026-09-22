@@ -388,7 +388,7 @@ export default function ApplyForPropertyPage() {
   // Step Validation Logic
   const isStep1Valid = Boolean(fullName.trim() && phone.trim() && email.trim() && dob && nationality.trim());
   const isStep2Valid = Boolean(idFrontFile && idBackFile);
-  const isStep3Valid = Boolean(ssnNumber.trim() && employer.trim() && occupation.trim() && monthlyIncome.trim() && currentAddress.trim() && incomeDoc && addressDoc);
+  const isStep3Valid = Boolean(ssnNumber.trim() && employer.trim() && occupation.trim() && monthlyIncome.trim() && currentAddress.trim());
   const isStep4Valid = Boolean(moveInDate && leaseMonths && occupants);
   const isStep5Valid = feeSettings.is_enabled ? Boolean(selectedMethodId && proofPaymentFile) : true;
   const isStep6Valid = Boolean(agreedToTerms);
@@ -464,46 +464,62 @@ export default function ApplyForPropertyPage() {
         additional_notes: additionalNotes,
         submitted_at: new Date().toISOString(),
         documents: [
-          {
-            id: `doc-${Date.now()}-1`,
-            application_id: newAppId,
-            document_type: idType as DocumentType,
-            file_name: idFrontFile?.name || 'id_front.jpg',
-            storage_path: idFrontFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile?.name || 'id_front.jpg'}`),
-            file_size_bytes: idFrontFile?.bytes || 1500000,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `doc-${Date.now()}-2`,
-            application_id: newAppId,
-            document_type: idType as DocumentType,
-            file_name: idBackFile?.name || 'id_back.jpg',
-            storage_path: idBackFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile?.name || 'id_back.jpg'}`),
-            file_size_bytes: idBackFile?.bytes || 1500000,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `doc-${Date.now()}-3`,
-            application_id: newAppId,
-            document_type: 'proof_of_income',
-            file_name: incomeDoc?.name || 'paystub.pdf',
-            storage_path: incomeDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc?.name || 'income.pdf'}`),
-            file_size_bytes: incomeDoc?.bytes || 2000000,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: `doc-${Date.now()}-4`,
-            application_id: newAppId,
-            document_type: 'utility_bill_address',
-            file_name: addressDoc?.name || 'utility_bill.pdf',
-            storage_path: addressDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc?.name || 'address.pdf'}`),
-            file_size_bytes: addressDoc?.bytes || 1000000,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          },
+          ...(idFrontFile
+            ? [
+                {
+                  id: `doc-${Date.now()}-1`,
+                  application_id: newAppId,
+                  document_type: idType as DocumentType,
+                  file_name: idFrontFile.name || 'id_front.jpg',
+                  storage_path: idFrontFile.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile.name || 'id_front.jpg'}`),
+                  file_size_bytes: idFrontFile.bytes || 1500000,
+                  status: 'pending' as any,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : []),
+          ...(idBackFile
+            ? [
+                {
+                  id: `doc-${Date.now()}-2`,
+                  application_id: newAppId,
+                  document_type: idType as DocumentType,
+                  file_name: idBackFile.name || 'id_back.jpg',
+                  storage_path: idBackFile.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile.name || 'id_back.jpg'}`),
+                  file_size_bytes: idBackFile.bytes || 1500000,
+                  status: 'pending' as any,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : []),
+          ...(incomeDoc
+            ? [
+                {
+                  id: `doc-${Date.now()}-3`,
+                  application_id: newAppId,
+                  document_type: 'proof_of_income' as DocumentType,
+                  file_name: incomeDoc.name || 'paystub.pdf',
+                  storage_path: incomeDoc.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc.name || 'income.pdf'}`),
+                  file_size_bytes: incomeDoc.bytes || 2000000,
+                  status: 'pending' as any,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : []),
+          ...(addressDoc
+            ? [
+                {
+                  id: `doc-${Date.now()}-4`,
+                  application_id: newAppId,
+                  document_type: 'utility_bill_address' as DocumentType,
+                  file_name: addressDoc.name || 'utility_bill.pdf',
+                  storage_path: addressDoc.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc.name || 'address.pdf'}`),
+                  file_size_bytes: addressDoc.bytes || 1000000,
+                  status: 'pending' as any,
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : []),
           ...(feeSettings.is_enabled && proofPaymentFile
             ? [
                 {
@@ -560,42 +576,58 @@ export default function ApplyForPropertyPage() {
 
           // B. Insert application documents into public.application_documents
           const docsToInsert = [
-            {
-              application_id: createdDbAppId,
-              document_type: idType,
-              file_name: idFrontFile?.name || 'id_front.jpg',
-              storage_path: idFrontFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile?.name || 'id_front.jpg'}`),
-              file_size_bytes: idFrontFile?.bytes || 1500000,
-              mime_type: idFrontFile?.type || 'image/jpeg',
-              status: 'pending',
-            },
-            {
-              application_id: createdDbAppId,
-              document_type: idType,
-              file_name: idBackFile?.name || 'id_back.jpg',
-              storage_path: idBackFile?.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile?.name || 'id_back.jpg'}`),
-              file_size_bytes: idBackFile?.bytes || 1500000,
-              mime_type: idBackFile?.type || 'image/jpeg',
-              status: 'pending',
-            },
-            {
-              application_id: createdDbAppId,
-              document_type: 'proof_of_income',
-              file_name: incomeDoc?.name || 'paystub.pdf',
-              storage_path: incomeDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc?.name || 'income.pdf'}`),
-              file_size_bytes: incomeDoc?.bytes || 2000000,
-              mime_type: incomeDoc?.type || 'application/pdf',
-              status: 'pending',
-            },
-            {
-              application_id: createdDbAppId,
-              document_type: 'utility_bill_address',
-              file_name: addressDoc?.name || 'utility_bill.pdf',
-              storage_path: addressDoc?.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc?.name || 'address.pdf'}`),
-              file_size_bytes: addressDoc?.bytes || 1000000,
-              mime_type: addressDoc?.type || 'application/pdf',
-              status: 'pending',
-            },
+            ...(idFrontFile
+              ? [
+                  {
+                    application_id: createdDbAppId,
+                    document_type: idType,
+                    file_name: idFrontFile.name || 'id_front.jpg',
+                    storage_path: idFrontFile.storagePath || resolveDocumentUrl(`/vault/${email}/${idFrontFile.name || 'id_front.jpg'}`),
+                    file_size_bytes: idFrontFile.bytes || 1500000,
+                    mime_type: idFrontFile.type || 'image/jpeg',
+                    status: 'pending',
+                  },
+                ]
+              : []),
+            ...(idBackFile
+              ? [
+                  {
+                    application_id: createdDbAppId,
+                    document_type: idType,
+                    file_name: idBackFile.name || 'id_back.jpg',
+                    storage_path: idBackFile.storagePath || resolveDocumentUrl(`/vault/${email}/${idBackFile.name || 'id_back.jpg'}`),
+                    file_size_bytes: idBackFile.bytes || 1500000,
+                    mime_type: idBackFile.type || 'image/jpeg',
+                    status: 'pending',
+                  },
+                ]
+              : []),
+            ...(incomeDoc
+              ? [
+                  {
+                    application_id: createdDbAppId,
+                    document_type: 'proof_of_income',
+                    file_name: incomeDoc.name || 'paystub.pdf',
+                    storage_path: incomeDoc.storagePath || resolveDocumentUrl(`/vault/${email}/${incomeDoc.name || 'income.pdf'}`),
+                    file_size_bytes: incomeDoc.bytes || 2000000,
+                    mime_type: incomeDoc.type || 'application/pdf',
+                    status: 'pending',
+                  },
+                ]
+              : []),
+            ...(addressDoc
+              ? [
+                  {
+                    application_id: createdDbAppId,
+                    document_type: 'utility_bill_address',
+                    file_name: addressDoc.name || 'utility_bill.pdf',
+                    storage_path: addressDoc.storagePath || resolveDocumentUrl(`/vault/${email}/${addressDoc.name || 'address.pdf'}`),
+                    file_size_bytes: addressDoc.bytes || 1000000,
+                    mime_type: addressDoc.type || 'application/pdf',
+                    status: 'pending',
+                  },
+                ]
+              : []),
             ...(feeSettings.is_enabled && proofPaymentFile
               ? [
                   {
@@ -611,7 +643,9 @@ export default function ApplyForPropertyPage() {
               : []),
           ];
 
-          await supabase.from('application_documents').insert(docsToInsert);
+          if (docsToInsert.length > 0) {
+            await supabase.from('application_documents').insert(docsToInsert);
+          }
 
           // C. Insert payment record into public.application_payments
           if (feeSettings.is_enabled && proofPaymentFile) {
@@ -1171,13 +1205,13 @@ export default function ApplyForPropertyPage() {
         {currentStep === 3 && (
           <div className="animate-fade-in card" style={{ padding: '24px 28px', borderRadius: 'var(--radius-2xl)', backgroundColor: 'var(--color-white)' }}>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--color-navy-dark)', marginBottom: 6 }}>
-              3. SSN, Employment & Proof of Income / Address
+              3. SSN & Employment Background
             </h2>
             <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20 }}>
-              Provide your employment background, SSN for credit background check, and supporting verification files.
+              Provide your employment background, income details, and SSN for credit background check.
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 8 }}>
               {/* SSN Number */}
               <div className="form-group">
                 <label className="form-label">
@@ -1263,129 +1297,6 @@ export default function ApplyForPropertyPage() {
                   onChange={(e) => setCurrentAddress(e.target.value)}
                   required
                 />
-              </div>
-            </div>
-
-            {/* Hidden File Inputs */}
-            <input type="file" ref={incomeInputRef} onChange={(e) => handleGenericFileUpload(e, setIncomeDoc)} style={{ display: 'none' }} accept=".jpg,.jpeg,.png,.pdf" />
-            <input type="file" ref={addressInputRef} onChange={(e) => handleGenericFileUpload(e, setAddressDoc)} style={{ display: 'none' }} accept=".jpg,.jpeg,.png,.pdf" />
-
-            {/* Verification Documents Uploads */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-              {/* Proof of Income */}
-              <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 18, backgroundColor: 'var(--color-surface-subtle)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Proof of Income (Paystub / W-2) <span style={{ color: 'var(--color-danger)' }}>*</span></span>
-                  {incomeDoc?.fromVault && <Badge variant="verified">Loaded from Vault</Badge>}
-                </div>
-
-                {incomeDoc ? (
-                  <div style={{ backgroundColor: 'var(--color-white)', padding: 14, borderRadius: 'var(--radius-lg)', border: '1px solid #BAE6FD' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      {incomeDoc.previewUrl ? (
-                        <img src={incomeDoc.previewUrl} alt="Income" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-                      ) : (
-                        <FileText size={24} color="var(--color-primary)" />
-                      )}
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{incomeDoc.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{incomeDoc.size}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewModalFile({ name: incomeDoc.name, title: 'Proof of Income', previewUrl: incomeDoc.previewUrl, isImage: Boolean(incomeDoc.previewUrl && incomeDoc.type.includes('image')) })}
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, fontSize: 12 }}
-                      >
-                        <Eye size={14} /> Preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => incomeInputRef.current?.click()}
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, fontSize: 12 }}
-                      >
-                        <RefreshCw size={14} /> Replace
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => incomeInputRef.current?.click()}
-                    style={{
-                      border: '2px dashed #CBD5E1',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: '24px 14px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: 'var(--color-white)',
-                    }}
-                  >
-                    <Upload size={26} color="var(--color-primary)" style={{ margin: '0 auto 6px auto' }} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>Upload Paystub or Tax Return</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>PDF or Image up to 15MB</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Proof of Current Address */}
-              <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-xl)', padding: 18, backgroundColor: 'var(--color-surface-subtle)' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-navy-dark)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>Proof of Address (Utility Bill) <span style={{ color: 'var(--color-danger)' }}>*</span></span>
-                  {addressDoc?.fromVault && <Badge variant="verified">Loaded from Vault</Badge>}
-                </div>
-
-                {addressDoc ? (
-                  <div style={{ backgroundColor: 'var(--color-white)', padding: 14, borderRadius: 'var(--radius-lg)', border: '1px solid #BAE6FD' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      {addressDoc.previewUrl ? (
-                        <img src={addressDoc.previewUrl} alt="Address" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }} />
-                      ) : (
-                        <FileText size={24} color="var(--color-primary)" />
-                      )}
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{addressDoc.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{addressDoc.size}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewModalFile({ name: addressDoc.name, title: 'Proof of Address', previewUrl: addressDoc.previewUrl, isImage: Boolean(addressDoc.previewUrl && addressDoc.type.includes('image')) })}
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, fontSize: 12 }}
-                      >
-                        <Eye size={14} /> Preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addressInputRef.current?.click()}
-                        className="btn btn-secondary btn-sm"
-                        style={{ flex: 1, fontSize: 12 }}
-                      >
-                        <RefreshCw size={14} /> Replace
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => addressInputRef.current?.click()}
-                    style={{
-                      border: '2px dashed #CBD5E1',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: '24px 14px',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: 'var(--color-white)',
-                    }}
-                  >
-                    <Upload size={26} color="var(--color-primary)" style={{ margin: '0 auto 6px auto' }} />
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-navy-dark)' }}>Upload Utility Bill or Lease</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>PDF or Image up to 15MB</div>
-                  </div>
-                )}
               </div>
             </div>
           </div>

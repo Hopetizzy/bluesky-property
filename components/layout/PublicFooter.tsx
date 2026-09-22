@@ -321,7 +321,7 @@ export const PublicFooter: React.FC = () => {
           }}
         >
           <div>
-            © {new Date().getFullYear()} Blue Sky Property Management Worldwide LLC. All rights reserved. Equal Housing Opportunity.
+            © 2025 Blue Sky Property Management Worldwide LLC. All rights reserved. Equal Housing Opportunity.
           </div>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', justifyContent: 'center' }}>
             <Link href="/privacy" style={{ color: '#94A3B8', textDecoration: 'none' }}>Privacy Policy</Link>
